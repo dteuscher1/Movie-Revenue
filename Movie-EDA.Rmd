@@ -1,0 +1,54 @@
+---
+title: "Movie Revenue"
+output: pdf_document
+---
+
+Packages used for analysis
+```{r}
+library(tidyverse)
+library(caret)
+library(Amelia)
+```
+
+Read in the data
+```{r, warning=FALSE}
+movie_train <- read.csv("train.csv", stringsAsFactors = FALSE, na.strings = c("", NA))
+movie_test <- read.csv("test.csv", stringsAsFactors = FALSE, na.strings = c("", NA))
+head(movie_test)
+movie_data <- bind_rows(movie_train, movie_test)
+```
+
+
+```{r}
+str(movie_data) # Well some of these variables don't look like fun; belongs to collection, genres, production companies, production countries and so forth
+```
+
+
+```{r}
+# Plots of numeric variables
+ggplot(movie_data, aes(x=popularity, y = revenue)) + geom_point() + geom_smooth(method = "loess", se = FALSE) + xlim(0, 300)
+ggplot(movie_data, aes(x=runtime, y = revenue)) + geom_point() + geom_smooth(method = "loess", se = FALSE)
+ggplot(movie_data, aes(x=budget, y = revenue)) + geom_point() + geom_smooth(method = "loess", se = FALSE)
+
+# Plot of how many values are missing
+missmap(movie_data, col = c("red", "navyblue"))
+```
+
+Categorical variables
+```{r}
+# The categorical variables will be more difficult to deal with 
+# Belongs to a collection
+sum(is.na(movie_data$belongs_to_collection))
+nrow(movie_data)
+# It seems that most movies don't belong to a collection, so I'm going to create an indicator variable to specify if a movie belongs to a collection or not
+movie_data <- movie_data %>% mutate(Collection = ifelse(is.na(belongs_to_collection), 0, 1))
+
+# Original Language
+sum(movie_data$original_language == "en")
+
+# Most of the movies are English, so I'm going to add another indicator variable to specify if the original language was English or not
+movie_data <- movie_data %>% mutate(English = ifelse(original_language == "en", 1, 0))
+
+# For the others, we are likely going to have to use regular expressions to get information out of it I believe
+```
+
