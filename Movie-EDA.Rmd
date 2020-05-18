@@ -8,6 +8,7 @@ Packages used for analysis
 library(tidyverse)
 library(caret)
 library(Amelia)
+library(stringr)
 ```
 
 Read in the data
@@ -50,5 +51,29 @@ sum(movie_data$original_language == "en")
 movie_data <- movie_data %>% mutate(English = ifelse(original_language == "en", 1, 0))
 
 # For the others, we are likely going to have to use regular expressions to get information out of it I believe
+```
+
+```{r}
+# Pulling out just the abbreviations
+movie_data$spoken_languages <- sapply(movie_data$spoken_languages, function(x){unlist(str_extract_all(x, '(?<=\')[:lower:]{2}(?=\')'))})
+```
+
+```{r}
+head(movie_data$spoken_languages)
+```
+
+```{r}
+movie_data <- movie_data %>% mutate(SpEnglish = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'en'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpArabic = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'ar'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpKorean = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'ko'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpJapanese = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'ja'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpRussian = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'ru'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpFrench = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'fr'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpItalian = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'it'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpGerman = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'de'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpSpanish = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'es'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpPortugese = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'pt'))}), 1, 0))
+
+# unknown languages: hi, zh, la, he, qu, tr, ta, te, cn, gd, sv
 ```
 
