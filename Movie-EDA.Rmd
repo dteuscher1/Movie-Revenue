@@ -9,6 +9,7 @@ library(tidyverse)
 library(caret)
 library(Amelia)
 library(stringr)
+library(DataExplorer)
 ```
 
 Read in the data
@@ -33,6 +34,7 @@ ggplot(movie_data, aes(x=budget, y = revenue)) + geom_point() + geom_smooth(meth
 
 # Plot of how many values are missing
 missmap(movie_data, col = c("red", "navyblue"))
+plot_missing(movie_data)
 ```
 
 Categorical variables
