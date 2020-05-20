@@ -75,7 +75,27 @@ movie_data <- movie_data %>% mutate(SpItalian = ifelse(sapply(movie_data$spoken_
 movie_data <- movie_data %>% mutate(SpGerman = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'de'))}), 1, 0))
 movie_data <- movie_data %>% mutate(SpSpanish = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'es'))}), 1, 0))
 movie_data <- movie_data %>% mutate(SpPortugese = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'pt'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpHi = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'hi'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpZh = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'zh'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpLa = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'la'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpHe = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'he'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpQu = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'qu'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpTr = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'tr'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpTa = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'ta'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpTe = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'te'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpCn = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'cn'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpGd = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'gd'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpSv = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'sv'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpCs = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'cs'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpHu = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'hu'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpGa = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'ga'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpEl = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'el'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpPl = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'pl'))}), 1, 0))
+```
 
-# unknown languages: hi, zh, la, he, qu, tr, ta, te, cn, gd, sv
+```{r}
+# Ok this isn't the most efficient way but it works
+# Created a variable for total number of languages spoken in a film (Num_Languages)
+movie_data$Num_Languages <- movie_data$SpArabic + movie_data$SpCn + movie_data$SpCs + movie_data$SpEl + movie_data$SpEnglish + movie_data$SpFrench + movie_data$SpGa + movie_data$SpGd + movie_data$SpGerman + movie_data$SpHe + movie_data$SpHi + movie_data$SpHu + movie_data$SpItalian + movie_data$SpJapanese + movie_data$SpKorean + movie_data$SpLa + movie_data$SpPl + movie_data$SpPortugese + movie_data$SpQu + movie_data$SpRussian + movie_data$SpSpanish + movie_data$SpSv + movie_data$SpTa + movie_data$SpTe + movie_data$SpTr + movie_data$SpZh
 ```
 
