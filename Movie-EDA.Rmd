@@ -91,11 +91,33 @@ movie_data <- movie_data %>% mutate(SpHu = ifelse(sapply(movie_data$spoken_langu
 movie_data <- movie_data %>% mutate(SpGa = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'ga'))}), 1, 0))
 movie_data <- movie_data %>% mutate(SpEl = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'el'))}), 1, 0))
 movie_data <- movie_data %>% mutate(SpPl = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'pl'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpTl = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'tl'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpTh = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'th'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpNo = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'no'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpDa = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'da'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpNl = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'nl'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpSr = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'sr'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpFa = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'fa'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpXx = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'xx'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpFi = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'fi'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpUr = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'ur'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpAm = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'am'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpMi = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'mi'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpMl = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'ml'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpBn = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'bn'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpRo = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'ro'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpIu = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'iu'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpId = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'id'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpMr = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'mr'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpAf = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'af'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpXh = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'xh'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpZu = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'zu'))}), 1, 0))
+movie_data <- movie_data %>% mutate(SpKn = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'kn'))}), 1, 0))
 ```
 
 ```{r}
 # Ok this isn't the most efficient way but it works
 # Created a variable for total number of languages spoken in a film (Num_Languages)
-movie_data$Num_Languages <- movie_data$SpArabic + movie_data$SpCn + movie_data$SpCs + movie_data$SpEl + movie_data$SpEnglish + movie_data$SpFrench + movie_data$SpGa + movie_data$SpGd + movie_data$SpGerman + movie_data$SpHe + movie_data$SpHi + movie_data$SpHu + movie_data$SpItalian + movie_data$SpJapanese + movie_data$SpKorean + movie_data$SpLa + movie_data$SpPl + movie_data$SpPortugese + movie_data$SpQu + movie_data$SpRussian + movie_data$SpSpanish + movie_data$SpSv + movie_data$SpTa + movie_data$SpTe + movie_data$SpTr + movie_data$SpZh
+movie_data$Num_Languages <- movie_data$SpAf + movie_data$SpAm + movie_data$SpArabic + movie_data$SpBn + movie_data$SpCn + movie_data$SpCs + movie_data$SpDa + movie_data$SpEl + movie_data$SpEnglish + movie_data$SpFa + movie_data$SpFi + movie_data$SpFrench + movie_data$SpGa + movie_data$SpGd + movie_data$SpGerman + movie_data$SpHe + movie_data$SpHi + movie_data$SpHu + movie_data$SpId + movie_data$SpItalian + movie_data$SpIu + movie_data$SpJapanese + movie_data$SpKn + movie_data$SpKorean + movie_data$SpLa + movie_data$SpMi + movie_data$SpMl + movie_data$SpMr + movie_data$SpNl + movie_data$SpNo + movie_data$SpPl + movie_data$SpPortugese + movie_data$SpQu + movie_data$SpRo + movie_data$SpRussian + movie_data$SpSpanish + movie_data$SpSr + movie_data$SpSv + movie_data$SpTa + movie_data$SpTe + movie_data$SpTh + movie_data$SpTl + movie_data$SpTr + movie_data$SpUr + movie_data$SpXh + movie_data$SpXx + movie_data$SpZh + movie_data$SpZu
 ```
 
