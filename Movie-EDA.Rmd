@@ -79,3 +79,49 @@ movie_data <- movie_data %>% mutate(SpPortugese = ifelse(sapply(movie_data$spoke
 # unknown languages: hi, zh, la, he, qu, tr, ta, te, cn, gd, sv
 ```
 
+```{r}
+# Genres
+movie_data$genre_list <- sapply(movie_data$genres, function(x){unlist(str_extract_all(x, '(?<=\')([A-Z])\\w+(.*?)(?=\')'))})
+dv <- qdapTools::mtabulate(movie_data$genre_list) 
+colnames(dv) <- paste0("Genre", gsub(" ", "", colnames(dv)))
+rownames(dv) <- 1:nrow(dv)
+
+movie_data <- cbind(movie_data, dv)
+
+# Attempt 2
+# 
+# pre_genre <- gregexpr(": \'(.*?)}", movie_data$genres)
+# pre_genre2 <- regmatches(movie_data$genres, pre_genre)
+# genres <- lapply(pre_genre2, function(x) substr(x,4,nchar(x) - 2))
+# 
+# movie$genre <- genres
+# dv <- qdapTools::mtabulate(movie$genre); colnames(dv) <- paste0("Genre", gsub(" ", "", colnames(dv)))
+# 
+# movie_data <- cbind(movie_data, dv)
+
+
+# Attempt 1
+# 
+# pre_genre <- gregexpr(": \'(.*?)}", movie_data$genres)
+# pre_genre2 <- regmatches(movie_data$genres, pre_genre)
+# genres <- lapply(pre_genre2, function(x) substr(x,4,nchar(x) - 2))
+#
+# genre_vec <- unlist(genres)
+# genre_names <- names(table(genre_vec))
+# genre.df <- plyr::ldply(genres, rbind)
+# 
+# dv <- matrix(0, ncol = length(genre_names), nrow = nrow(movie_data))
+# for(i in 1:ncol(genre.df)) {
+#   temp <- fastDummies::dummy_cols(genre.df[,i])
+#   temp <- temp[,-1]
+#   colnames(temp) <- substr(colnames(temp), 7, nchar(colnames(temp)))
+#   temp[,setdiff(genre_names, colnames(temp))] <- 0
+#   temp <- temp[,genre_names]
+#   temp[is.na(temp)] <- 0
+#   dv <- dv + temp
+# }
+# colnames(dv) <- gsub(" ", "",colnames(dv))
+# colnames(dv) <- paste0("Genre",colnames(dv))
+# movie_data <- cbind(movie_data, dv)
+```
+
