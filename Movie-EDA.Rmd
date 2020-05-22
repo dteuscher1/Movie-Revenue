@@ -186,7 +186,7 @@ test
 # Analyzing features with many NAs
 
 movie_nas <- movie_train[,c("Keywords", "tagline", "homepage", "belongs_to_collection", "revenue")]
-movie_nas <- movie_nas %>% mutate_at(.funs = list(cat = ~ifelse(is.na(.), 0, 1)), .vars=1:4)
+movie_nas <- movie_nas %>% mutate_at(.funs = list(ind = ~ifelse(is.na(.), 0, 1)), .vars=c("Keywords", "tagline", "homepage", "belongs_to_collection"))
 
 # Keywords
 mean(movie_nas[movie_nas$Keywords_cat==1,]$revenue)
@@ -211,5 +211,12 @@ mean(movie_nas[movie_nas$belongs_to_collection_cat==1,]$revenue)
 mean(movie_nas[movie_nas$belongs_to_collection_cat==0,]$revenue)
 
 boxplot(revenue~belongs_to_collection_cat, data=movie_nas)
+
+#
+# For each of these features, there is a higher average revenue when not NA than when NA
+#
+
+# Add indicator columns to main data
+movie_data <- movie_data %>% mutate_at(.funs = list(ind = ~ifelse(is.na(.), 0, 1)), .vars=c("Keywords", "tagline", "homepage", "belongs_to_collection"))
 ```
 
