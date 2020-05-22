@@ -23,6 +23,9 @@ movie_data <- bind_rows(movie_train, movie_test)
 
 ```{r}
 str(movie_data) # Well some of these variables don't look like fun; belongs to collection, genres, production companies, production countries and so forth
+
+movie_data$release_date <- as.Date(movie_data$release_date, format = "%m/%d/%y")
+head(movie_data$release_date)
 ```
 
 
@@ -186,7 +189,7 @@ test
 # Analyzing features with many NAs
 
 movie_nas <- movie_train[,c("Keywords", "tagline", "homepage", "belongs_to_collection", "revenue")]
-movie_nas <- movie_nas %>% mutate_at(.funs = list(ind = ~ifelse(is.na(.), 0, 1)), .vars=c("Keywords", "tagline", "homepage", "belongs_to_collection"))
+movie_nas <- movie_nas %>% mutate_at(.funs = list(cat = ~ifelse(is.na(.), 0, 1)), .vars=c("Keywords", "tagline", "homepage", "belongs_to_collection"))
 
 # Keywords
 mean(movie_nas[movie_nas$Keywords_cat==1,]$revenue)
