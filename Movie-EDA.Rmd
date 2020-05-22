@@ -224,3 +224,15 @@ movie_data <- movie_data %>% mutate_at(.funs = list(ind = ~ifelse(is.na(.), 0, 1
 ```
 
 
+```{r}
+#eliminating unnecessary variables
+colnames(movie_data)
+
+#c("ï..id", "belongs_to_collection", "genres", "homepage", "imdb_id", "original_language", "original_title", "overview", "poster_path", "production_companies", "production_countries", "spoken_languages", "status", "tagline", "title", "Keywords", "cast", "crew")
+
+#ideas
+#sentiment on title
+#cast and crew- make count Shane
+#number of genres - McKay
+```
+
