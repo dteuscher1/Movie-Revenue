@@ -4,7 +4,7 @@ output: pdf_document
 ---
 
 Packages used for analysis
-```{r}
+```{r, message = FALSE}
 library(tidyverse)
 library(caret)
 library(Amelia)
@@ -23,6 +23,9 @@ movie_data <- bind_rows(movie_train, movie_test)
 
 ```{r}
 str(movie_data) # Well some of these variables don't look like fun; belongs to collection, genres, production companies, production countries and so forth
+
+movie_data$release_date <- as.Date(movie_data$release_date, format = "%m/%d/%y")
+head(movie_data$release_date)
 ```
 
 
@@ -130,11 +133,11 @@ movie_data$Num_Languages <- movie_data %>%
 ```{r}
 # Genres
 movie_data$genre_list <- sapply(movie_data$genres, function(x){unlist(str_extract_all(x, '(?<=\')([A-Z])\\w+(.*?)(?=\')'))})
-dv <- qdapTools::mtabulate(movie_data$genre_list) 
-colnames(dv) <- paste0("Genre", gsub(" ", "", colnames(dv)))
-rownames(dv) <- 1:nrow(dv)
+dv_g <- qdapTools::mtabulate(movie_data$genre_list) 
+colnames(dv_g) <- paste0("Genre", gsub(" ", "", colnames(dv_g)))
+rownames(dv_g) <- 1:nrow(dv_g)
 
-movie_data <- cbind(movie_data, dv)
+movie_data <- cbind(movie_data, dv_g)
 
 # Attempt 2
 # 
@@ -212,7 +215,7 @@ companies_freq
 # Analyzing features with many NAs
 
 movie_nas <- movie_train[,c("Keywords", "tagline", "homepage", "belongs_to_collection", "revenue")]
-movie_nas <- movie_nas %>% mutate_at(.funs = list(cat = ~ifelse(is.na(.), 0, 1)), .vars=1:4)
+movie_nas <- movie_nas %>% mutate_at(.funs = list(cat = ~ifelse(is.na(.), 0, 1)), .vars=c("Keywords", "tagline", "homepage", "belongs_to_collection"))
 
 # Keywords
 mean(movie_nas[movie_nas$Keywords_cat==1,]$revenue)
@@ -237,5 +240,11 @@ mean(movie_nas[movie_nas$belongs_to_collection_cat==1,]$revenue)
 mean(movie_nas[movie_nas$belongs_to_collection_cat==0,]$revenue)
 
 boxplot(revenue~belongs_to_collection_cat, data=movie_nas)
-```
 
+#
+# For each of these features, there is a higher average revenue when not NA than when NA
+#
+
+# Add indicator columns to main data
+movie_data <- movie_data %>% mutate_at(.funs = list(ind = ~ifelse(is.na(.), 0, 1)), .vars=c("Keywords", "tagline", "homepage", "belongs_to_collection"))
+```
