@@ -119,7 +119,12 @@ movie_data <- movie_data %>% mutate(SpKn = ifelse(sapply(movie_data$spoken_langu
 ```{r}
 # Ok this isn't the most efficient way but it works
 # Created a variable for total number of languages spoken in a film (Num_Languages)
-movie_data$Num_Languages <- movie_data$SpAf + movie_data$SpAm + movie_data$SpArabic + movie_data$SpBn + movie_data$SpCn + movie_data$SpCs + movie_data$SpDa + movie_data$SpEl + movie_data$SpEnglish + movie_data$SpFa + movie_data$SpFi + movie_data$SpFrench + movie_data$SpGa + movie_data$SpGd + movie_data$SpGerman + movie_data$SpHe + movie_data$SpHi + movie_data$SpHu + movie_data$SpId + movie_data$SpItalian + movie_data$SpIu + movie_data$SpJapanese + movie_data$SpKn + movie_data$SpKorean + movie_data$SpLa + movie_data$SpMi + movie_data$SpMl + movie_data$SpMr + movie_data$SpNl + movie_data$SpNo + movie_data$SpPl + movie_data$SpPortugese + movie_data$SpQu + movie_data$SpRo + movie_data$SpRussian + movie_data$SpSpanish + movie_data$SpSr + movie_data$SpSv + movie_data$SpTa + movie_data$SpTe + movie_data$SpTh + movie_data$SpTl + movie_data$SpTr + movie_data$SpUr + movie_data$SpXh + movie_data$SpXx + movie_data$SpZh + movie_data$SpZu
+# movie_data$Num_Languages <- movie_data$SpAf + movie_data$SpAm + movie_data$SpArabic + movie_data$SpBn + movie_data$SpCn + movie_data$SpCs + movie_data$SpDa + movie_data$SpEl + movie_data$SpEnglish + movie_data$SpFa + movie_data$SpFi + movie_data$SpFrench + movie_data$SpGa + movie_data$SpGd + movie_data$SpGerman + movie_data$SpHe + movie_data$SpHi + movie_data$SpHu + movie_data$SpId + movie_data$SpItalian + movie_data$SpIu + movie_data$SpJapanese + movie_data$SpKn + movie_data$SpKorean + movie_data$SpLa + movie_data$SpMi + movie_data$SpMl + movie_data$SpMr + movie_data$SpNl + movie_data$SpNo + movie_data$SpPl + movie_data$SpPortugese + movie_data$SpQu + movie_data$SpRo + movie_data$SpRussian + movie_data$SpSpanish + movie_data$SpSr + movie_data$SpSv + movie_data$SpTa + movie_data$SpTe + movie_data$SpTh + movie_data$SpTl + movie_data$SpTr + movie_data$SpUr + movie_data$SpXh + movie_data$SpXx + movie_data$SpZh + movie_data$SpZu
+
+# Shorter alternative
+movie_data$Num_Languages <- movie_data %>%
+  select(SpEnglish:SpKn) %>%
+  rowSums()
 ```
 
 ```{r}
@@ -180,6 +185,27 @@ country_name <- function(x) {
 library(purrr)
 test <- separated %>% select(Country1:Country12) %>% map_df(~country_name(.))
 test
+```
+
+```{r}
+# Clean production company data
+
+# Get all companies into a usable list
+company_name <- function(x) {
+    result <- unlist(str_extract_all(x, pattern = "(?<=name': ')[^']+"))
+    result
+}
+companies <- lapply(movie_data$production_companies, company_name) %>%
+  unlist()
+
+# Find most frequently appearing companies
+companies_freq <- tibble(company = companies) %>%
+  group_by(company) %>%
+  count() %>%
+  arrange(desc(n)) %>%
+  filter(n >= 50 & !is.na(company))
+companies_freq
+
 ```
 
 ```{r}
