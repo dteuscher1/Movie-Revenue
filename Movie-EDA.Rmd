@@ -43,6 +43,7 @@ Categorical variables
 # Belongs to a collection
 sum(is.na(movie_data$belongs_to_collection))
 nrow(movie_data)
+
 # It seems that most movies don't belong to a collection, so I'm going to create an indicator variable to specify if a movie belongs to a collection or not
 movie_data <- movie_data %>% mutate(Collection = ifelse(is.na(belongs_to_collection), 0, 1))
 
@@ -165,6 +166,58 @@ movie_data <- cbind(movie_data, dv_g)
 # colnames(dv) <- gsub(" ", "",colnames(dv))
 # colnames(dv) <- paste0("Genre",colnames(dv))
 # movie_data <- cbind(movie_data, dv)
+
+head(movie_data)
+head(movie_data$production_countries,33)
+movie_data$production_countries[72]
+str_extract_all(movie_data$production_countries, pattern = "[:upper:][:upper:]")
+separated <- separate(movie_data, production_countries, sep = "\\}, \\{", into = c("Country1", "Country2", "Country3", "Country4", "Country5", "Country6", "Country7", "Country8", "Country9", "Country10", "Country11", "Country12"))
+head(separated)
+
+country_name <- function(x) {
+    str_extract(x, pattern = "(?<=name': ')[A-Za-z\\s]+")
+}
+library(purrr)
+test <- separated %>% select(Country1:Country12) %>% map_df(~country_name(.))
+test
+```
+
+```{r}
+# Analyzing features with many NAs
+
+movie_nas <- movie_train[,c("Keywords", "tagline", "homepage", "belongs_to_collection", "revenue")]
+movie_nas <- movie_nas %>% mutate_at(.funs = list(ind = ~ifelse(is.na(.), 0, 1)), .vars=c("Keywords", "tagline", "homepage", "belongs_to_collection"))
+
+# Keywords
+mean(movie_nas[movie_nas$Keywords_cat==1,]$revenue)
+mean(movie_nas[movie_nas$Keywords_cat==0,]$revenue)
+
+boxplot(revenue~Keywords_cat, data=movie_nas)
+
+# Tagline
+mean(movie_nas[movie_nas$tagline_cat==1,]$revenue)
+mean(movie_nas[movie_nas$tagline_cat==0,]$revenue)
+
+boxplot(revenue~tagline_cat, data=movie_nas)
+
+# Homepage
+mean(movie_nas[movie_nas$homepage_cat==1,]$revenue)
+mean(movie_nas[movie_nas$homepage_cat==0,]$revenue)
+
+boxplot(revenue~homepage_cat, data=movie_nas)
+
+# Collection
+mean(movie_nas[movie_nas$belongs_to_collection_cat==1,]$revenue)
+mean(movie_nas[movie_nas$belongs_to_collection_cat==0,]$revenue)
+
+boxplot(revenue~belongs_to_collection_cat, data=movie_nas)
+
+#
+# For each of these features, there is a higher average revenue when not NA than when NA
+#
+
+# Add indicator columns to main data
+movie_data <- movie_data %>% mutate_at(.funs = list(ind = ~ifelse(is.na(.), 0, 1)), .vars=c("Keywords", "tagline", "homepage", "belongs_to_collection"))
 ```
 
 
