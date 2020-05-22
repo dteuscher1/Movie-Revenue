@@ -4,7 +4,7 @@ output: pdf_document
 ---
 
 Packages used for analysis
-```{r}
+```{r, message = FALSE}
 library(tidyverse)
 library(caret)
 library(Amelia)
@@ -124,11 +124,11 @@ movie_data$Num_Languages <- movie_data$SpAf + movie_data$SpAm + movie_data$SpAra
 ```{r}
 # Genres
 movie_data$genre_list <- sapply(movie_data$genres, function(x){unlist(str_extract_all(x, '(?<=\')([A-Z])\\w+(.*?)(?=\')'))})
-dv <- qdapTools::mtabulate(movie_data$genre_list) 
-colnames(dv) <- paste0("Genre", gsub(" ", "", colnames(dv)))
-rownames(dv) <- 1:nrow(dv)
+dv_g <- qdapTools::mtabulate(movie_data$genre_list) 
+colnames(dv_g) <- paste0("Genre", gsub(" ", "", colnames(dv_g)))
+rownames(dv_g) <- 1:nrow(dv_g)
 
-movie_data <- cbind(movie_data, dv)
+movie_data <- cbind(movie_data, dv_g)
 
 # Attempt 2
 # 
@@ -166,4 +166,5 @@ movie_data <- cbind(movie_data, dv)
 # colnames(dv) <- paste0("Genre",colnames(dv))
 # movie_data <- cbind(movie_data, dv)
 ```
+
 
