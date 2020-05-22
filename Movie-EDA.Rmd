@@ -43,6 +43,7 @@ Categorical variables
 # Belongs to a collection
 sum(is.na(movie_data$belongs_to_collection))
 nrow(movie_data)
+
 # It seems that most movies don't belong to a collection, so I'm going to create an indicator variable to specify if a movie belongs to a collection or not
 movie_data <- movie_data %>% mutate(Collection = ifelse(is.na(belongs_to_collection), 0, 1))
 
@@ -179,5 +180,36 @@ country_name <- function(x) {
 library(purrr)
 test <- separated %>% select(Country1:Country12) %>% map_df(~country_name(.))
 test
+```
+
+```{r}
+# Analyzing features with many NAs
+
+movie_nas <- movie_train[,c("Keywords", "tagline", "homepage", "belongs_to_collection", "revenue")]
+movie_nas <- movie_nas %>% mutate_at(.funs = list(cat = ~ifelse(is.na(.), 0, 1)), .vars=1:4)
+
+# Keywords
+mean(movie_nas[movie_nas$Keywords_cat==1,]$revenue)
+mean(movie_nas[movie_nas$Keywords_cat==0,]$revenue)
+
+boxplot(revenue~Keywords_cat, data=movie_nas)
+
+# Tagline
+mean(movie_nas[movie_nas$tagline_cat==1,]$revenue)
+mean(movie_nas[movie_nas$tagline_cat==0,]$revenue)
+
+boxplot(revenue~tagline_cat, data=movie_nas)
+
+# Homepage
+mean(movie_nas[movie_nas$homepage_cat==1,]$revenue)
+mean(movie_nas[movie_nas$homepage_cat==0,]$revenue)
+
+boxplot(revenue~homepage_cat, data=movie_nas)
+
+# Collection
+mean(movie_nas[movie_nas$belongs_to_collection_cat==1,]$revenue)
+mean(movie_nas[movie_nas$belongs_to_collection_cat==0,]$revenue)
+
+boxplot(revenue~belongs_to_collection_cat, data=movie_nas)
 ```
 
