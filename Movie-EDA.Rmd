@@ -133,7 +133,9 @@ movie_data$Num_Languages <- movie_data %>%
 ```{r}
 # Genres
 movie_data$genre_list <- sapply(movie_data$genres, function(x){unlist(str_extract_all(x, '(?<=\')([A-Z])\\w+(.*?)(?=\')'))})
+movie_data$genre_list
 dv_g <- qdapTools::mtabulate(movie_data$genre_list) 
+head(dv_g)
 colnames(dv_g) <- paste0("Genre", gsub(" ", "", colnames(dv_g)))
 rownames(dv_g) <- 1:nrow(dv_g)
 
@@ -175,10 +177,7 @@ movie_data <- cbind(movie_data, dv_g)
 # colnames(dv) <- paste0("Genre",colnames(dv))
 # movie_data <- cbind(movie_data, dv)
 
-head(movie_data)
-head(movie_data$production_countries,33)
-movie_data$production_countries[72]
-str_extract_all(movie_data$production_countries, pattern = "[:upper:][:upper:]")
+#str_extract_all(movie_data$production_countries, pattern = "[:upper:][:upper:]")
 separated <- separate(movie_data, production_countries, sep = "\\}, \\{", into = c("Country1", "Country2", "Country3", "Country4", "Country5", "Country6", "Country7", "Country8", "Country9", "Country10", "Country11", "Country12"))
 head(separated)
 
@@ -186,8 +185,39 @@ country_name <- function(x) {
     str_extract(x, pattern = "(?<=name': ')[A-Za-z\\s]+")
 }
 library(purrr)
-test <- separated %>% select(Country1:Country12) %>% map_df(~country_name(.))
-test
+test <- separated %>% select(Country1:Country12) %>% map_df(~country_name(.)) %>% bind_cols(id = separated$id)
+countries <- test %>% pivot_longer(Country1:Country12, names_to = "CountryNumber", values_to = "Country", values_drop_na = TRUE)
+countries %>% 
+  group_by(Country) %>%
+  summarize(count = n()) %>% 
+  arrange(desc(count))
+
+library(forcats)
+another_test <- countries %>% 
+  mutate(Country = factor(Country),
+         Country = fct_lump_min(Country, min=100, other_level = "Other"))
+head(another_test)
+
+library(fastDummies)
+dummy_test <- another_test %>% dummy_cols(select_columns = "Country")
+head(dummy)
+backwards <- another_test %>% pivot_wider(id_cols = id, names_from = CountryNumber, values_from=Country)
+
+
+third_test <- backwards %>% unite("AllCountries", Country1:Country12, sep = ", ")
+
+clean <- third_test %>% mutate(AllCountries = list(str_remove_all(AllCountries, pattern = ", NA")))
+many_test <- sapply(clean$AllCountries, function(x){unlist(str_extract_all(x, '([A-Za-z])\\w+(,)'))})
+                    head(many_test)
+head(clean)
+library(qdapTools)
+
+qdapTools::mtabulate(as.list(clean$AllCountries))
+test_list <- as.list(clean$AllCountries)
+head(test_list)
+head(movie_data$genre_list)
+test_list[[1]]
+movie_data$genre_list[[1]]
 ```
 
 ```{r}
