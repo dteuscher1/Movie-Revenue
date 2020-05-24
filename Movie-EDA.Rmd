@@ -10,22 +10,27 @@ library(caret)
 library(Amelia)
 library(stringr)
 library(DataExplorer)
+library(fastDummies)
+library(forcats)
+library(purrr)
 ```
 
 Read in the data
 ```{r, warning=FALSE}
 movie_train <- read.csv("train.csv", stringsAsFactors = FALSE, na.strings = c("", NA))
 movie_test <- read.csv("test.csv", stringsAsFactors = FALSE, na.strings = c("", NA))
-head(movie_test)
 movie_data <- bind_rows(movie_train, movie_test)
 ```
 
 
 ```{r}
-str(movie_data) # Well some of these variables don't look like fun; belongs to collection, genres, production companies, production countries and so forth
+# Drop some variables that we don't need at all initially
+movie_data <- movie_data %>% dplyr::select(-imdb_id, -original_title, -overview, -poster_path, -status)
 
-movie_data$release_date <- as.Date(movie_data$release_date, format = "%m/%d/%y")
-head(movie_data$release_date)
+# Change release date to a date
+movie_data$release_date <- parse_date_time2(movie_data$release_date, orders = "%m%d%y", cutoff_2000 = 20L)
+
+plot(movie_data$release_date, movie_data$revenue)
 ```
 
 
@@ -62,10 +67,6 @@ movie_data <- movie_data %>% mutate(English = ifelse(original_language == "en", 
 ```{r}
 # Pulling out just the abbreviations
 movie_data$spoken_languages <- sapply(movie_data$spoken_languages, function(x){unlist(str_extract_all(x, '(?<=\')[:lower:]{2}(?=\')'))})
-```
-
-```{r}
-head(movie_data$spoken_languages)
 ```
 
 ```{r}
@@ -177,47 +178,57 @@ movie_data <- cbind(movie_data, dv_g)
 # colnames(dv) <- paste0("Genre",colnames(dv))
 # movie_data <- cbind(movie_data, dv)
 
-#str_extract_all(movie_data$production_countries, pattern = "[:upper:][:upper:]")
-separated <- separate(movie_data, production_countries, sep = "\\}, \\{", into = c("Country1", "Country2", "Country3", "Country4", "Country5", "Country6", "Country7", "Country8", "Country9", "Country10", "Country11", "Country12"))
-head(separated)
+```
 
+```{r country}
+# Split apart all of the countries into a separate column
+separated <- separate(movie_data, production_countries, sep = "\\}, \\{", into = c("Country1", "Country2", "Country3", "Country4", "Country5", "Country6", "Country7", "Country8", "Country9", "Country10", "Country11", "Country12"))
+
+# Function to extract the country name from the json formatted text
 country_name <- function(x) {
     str_extract(x, pattern = "(?<=name': ')[A-Za-z\\s]+")
 }
-library(purrr)
-test <- separated %>% select(Country1:Country12) %>% map_df(~country_name(.)) %>% bind_cols(id = separated$id)
-countries <- test %>% pivot_longer(Country1:Country12, names_to = "CountryNumber", values_to = "Country", values_drop_na = TRUE)
-countries %>% 
+
+# Apply the function to get the country name to all twelve country columns
+countries <- separated %>% select(Country1:Country12) %>% map_df(~country_name(.)) %>% bind_cols(id = separated$id)
+
+# Change any countries that have no production company to none
+countries$Country1[is.na(countries$Country1)] <- "None"
+
+# Reshape the data to long format to make country into a factor
+countries_long <- countries %>% pivot_longer(Country1:Country12, names_to = "CountryNumber", values_to = "Country", values_drop_na = TRUE)
+
+# Summarizes the number of movies for each country
+Country_summary <- countries_long %>% 
   group_by(Country) %>%
   summarize(count = n()) %>% 
   arrange(desc(count))
 
-library(forcats)
-another_test <- countries %>% 
+# Changes countries to a factor. Any country that has less than 100 movies produced there is clumped in the other group
+countries_fct <- countries_long %>% 
   mutate(Country = factor(Country),
          Country = fct_lump_min(Country, min=100, other_level = "Other"))
-head(another_test)
 
-library(fastDummies)
-dummy_test <- another_test %>% dummy_cols(select_columns = "Country")
-head(dummy)
-backwards <- another_test %>% pivot_wider(id_cols = id, names_from = CountryNumber, values_from=Country)
+# Make dummy variables for each country remained (and the None and Other groups)
+dummy_many <- countries_fct %>% dummy_cols(select_columns = "Country")
 
-
-third_test <- backwards %>% unite("AllCountries", Country1:Country12, sep = ", ")
-
-clean <- third_test %>% mutate(AllCountries = list(str_remove_all(AllCountries, pattern = ", NA")))
-many_test <- sapply(clean$AllCountries, function(x){unlist(str_extract_all(x, '([A-Za-z])\\w+(,)'))})
-                    head(many_test)
-head(clean)
-library(qdapTools)
-
-qdapTools::mtabulate(as.list(clean$AllCountries))
-test_list <- as.list(clean$AllCountries)
-head(test_list)
-head(movie_data$genre_list)
-test_list[[1]]
-movie_data$genre_list[[1]]
+# Combined the multiple observations into a single observation for each row
+# Variables are now ready to be included in the model. 
+country_dummies <- dummy_many %>% group_by(id) %>% mutate(Country_Australia = sum(Country_Australia),
+                                       Country_Canada = sum(Country_Canada),
+                                       Country_France = sum(Country_France),
+                                       Country_Germany = sum(Country_Germany),
+                                       Country_India = sum(Country_India),
+                                       Country_Italy = sum(Country_Italy),
+                                       Country_Japan = sum(Country_Japan),
+                                       Country_Other = sum(Country_Other),
+                                       Country_Russia = sum(Country_Russia),
+                                       Country_Spain = sum(Country_Spain),
+                                       `Country_United Kingdom` = sum(`Country_United Kingdom`),
+                                       `Country_United States of America` = sum(`Country_United States of America`),
+                                       Country_None = sum(Country_None)) %>% 
+                                  distinct(id, .keep_all = TRUE) %>% 
+                                  dplyr::select(-CountryNumber, -Country)
 ```
 
 ```{r}
