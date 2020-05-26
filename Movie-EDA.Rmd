@@ -23,7 +23,6 @@ movie_test <- read.csv("test.csv", stringsAsFactors = FALSE, na.strings = c("", 
 movie_data <- bind_rows(movie_train, movie_test)
 ```
 
-
 ```{r}
 # Drop some variables that we don't need at all initially
 movie_data <- movie_data %>% dplyr::select(-imdb_id, -original_title, -overview, -poster_path, -status)
@@ -32,12 +31,11 @@ movie_data <- movie_data %>% dplyr::select(-imdb_id, -original_title, -overview,
 movie_data$release_date <- parse_date_time2(movie_data$release_date, orders = "%m%d%y", cutoff_2000 = 20L)
 ```
 
-
 ```{r}
 # Plots of numeric variables
-ggplot(movie_data, aes(x=popularity, y = revenue)) + geom_point() + geom_smooth(method = "loess", se = FALSE) + xlim(0, 300)
-ggplot(movie_data, aes(x=runtime, y = revenue)) + geom_point() + geom_smooth(method = "loess", se = FALSE)
-ggplot(movie_data, aes(x=budget, y = revenue)) + geom_point() + geom_smooth(method = "loess", se = FALSE)
+ggplot(movie_data, aes(x = popularity, y = revenue)) + geom_point() + geom_smooth(method = "loess", se = FALSE) + xlim(0, 300)
+ggplot(movie_data, aes(x = runtime, y = revenue)) + geom_point() + geom_smooth(method = "loess", se = FALSE)
+ggplot(movie_data, aes(x = budget, y = revenue)) + geom_point() + geom_smooth(method = "loess", se = FALSE)
 
 # Plot of how many values are missing
 missmap(movie_data, col = c("red", "navyblue"))
@@ -49,40 +47,40 @@ Categorical variables
 # Analyzing features with many NAs
 
 movie_nas <- movie_train[,c("Keywords", "tagline", "homepage", "belongs_to_collection", "revenue")]
-movie_nas <- movie_nas %>% mutate_at(.funs = list(cat = ~ifelse(is.na(.), 0, 1)), .vars=c("Keywords", "tagline", "homepage", "belongs_to_collection"))
+movie_nas <- movie_nas %>% mutate_at(.funs = list(cat = ~ifelse(is.na(.), 0, 1)), .vars = c("Keywords", "tagline", "homepage", "belongs_to_collection"))
 
 # Keywords
-mean(movie_nas[movie_nas$Keywords_cat==1,]$revenue, na.rm = TRUE)
-mean(movie_nas[movie_nas$Keywords_cat==0,]$revenue, na.rm = TRUE)
+mean(movie_nas[movie_nas$Keywords_cat == 1,]$revenue, na.rm = TRUE)
+mean(movie_nas[movie_nas$Keywords_cat == 0,]$revenue, na.rm = TRUE)
 
-boxplot(revenue~Keywords_cat, data=movie_nas)
+boxplot(revenue~Keywords_cat, data = movie_nas)
 
 # Tagline
-mean(movie_nas[movie_nas$tagline_cat==1,]$revenue)
-mean(movie_nas[movie_nas$tagline_cat==0,]$revenue)
+mean(movie_nas[movie_nas$tagline_cat == 1,]$revenue)
+mean(movie_nas[movie_nas$tagline_cat == 0,]$revenue)
 
-boxplot(revenue~tagline_cat, data=movie_nas)
+boxplot(revenue~tagline_cat, data = movie_nas)
 
 # Homepage
-mean(movie_nas[movie_nas$homepage_cat==1,]$revenue)
-mean(movie_nas[movie_nas$homepage_cat==0,]$revenue)
+mean(movie_nas[movie_nas$homepage_cat == 1,]$revenue)
+mean(movie_nas[movie_nas$homepage_cat == 0,]$revenue)
 
-boxplot(revenue~homepage_cat, data=movie_nas)
+boxplot(revenue~homepage_cat, data = movie_nas)
 
 # Collection
-mean(movie_nas[movie_nas$belongs_to_collection_cat==1,]$revenue)
-mean(movie_nas[movie_nas$belongs_to_collection_cat==0,]$revenue)
-boxplot(revenue~belongs_to_collection_cat, data=movie_nas)
+mean(movie_nas[movie_nas$belongs_to_collection_cat == 1,]$revenue)
+mean(movie_nas[movie_nas$belongs_to_collection_cat == 0,]$revenue)
+boxplot(revenue~belongs_to_collection_cat, data = movie_nas)
 
 #
 # For each of these features, there is a higher average revenue when not NA than when NA
 #
 
 # Add indicator columns to main data
-movie_data <- movie_data %>% mutate_at(.funs = list(ind = ~ifelse(is.na(.), 0, 1)), .vars=c("Keywords", "tagline", "homepage", "belongs_to_collection"))
+movie_data <- movie_data %>% mutate_at(.funs = list(ind = ~ifelse(is.na(.), 0, 1)), .vars = c("Keywords", "tagline", "homepage", "belongs_to_collection"))
 
 # Drop columns
-movie_data <- movie_data %>% select(-belongs_to_collection, -homepage, - tagline, -Keywords)
+movie_data <- movie_data %>% select(-belongs_to_collection, -homepage, -tagline, -Keywords)
 ```
 
 ```{r}
@@ -237,7 +235,7 @@ Country_summary <- countries_long %>%
 # Changes countries to a factor. Any country that has less than 100 movies produced there is clumped in the other group
 countries_fct <- countries_long %>% 
   mutate(Country = factor(Country),
-         Country = fct_lump_min(Country, min=100, other_level = "Other"))
+         Country = fct_lump_min(Country, min = 100, other_level = "Other"))
 
 # Make dummy variables for each country remained (and the None and Other groups)
 dummy_many <- countries_fct %>% dummy_cols(select_columns = "Country")
