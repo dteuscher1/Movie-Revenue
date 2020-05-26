@@ -286,5 +286,27 @@ companies_freq
 ```{r}
 library(caret)
 head(movie_data)
+movie_data_1 <- movie_data %>% dplyr::select(-genres, -production_companies, -production_countries, -spoken_languages, -title, -cast, -crew, -genre_list)
+mini <- expand.grid(mtry = 50)
+custom_summary <- function(data, lev = NULL, model = NULL) {
+out <- Metrics::rmsle(data[, "obs"], data[, "pred"])
+names(out) <- c("rmsle")
+out
+}
+movie.train <- movie_data_1[!is.na(movie_data_1$revenue),]
+myControl <- trainControl(method = "cv",
+                          number = 10,
+                          summaryFunction = custom_summary)
+rf.model <- train(revenue~.,
+                  data = movie.train,
+                  method = "rf",
+                  tuneGrid = mini,
+                  trControl = myControl,
+                  metric = "rmsle",
+                  maximize = FALSE,
+                  preProc = "pca")
+head(movie_data)
+apply(movie.train, 2, function(x){any(is.na(x))})
+
 ```
 
