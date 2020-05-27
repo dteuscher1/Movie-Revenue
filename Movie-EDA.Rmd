@@ -105,6 +105,9 @@ movie_data <- movie_data %>% select(-original_language)
 ```{r}
 # Pulling out just the abbreviations
 movie_data$spoken_languages <- sapply(movie_data$spoken_languages, function(x){unlist(str_extract_all(x, '(?<=\')[:lower:]{2}(?=\')'))})
+
+# Changing NAs to "zz"
+movie_data[is.na(movie_data$spoken_languages),]$spoken_languages <- "zz"
 ```
 
 ```{r}
@@ -156,8 +159,7 @@ movie_data <- movie_data %>% mutate(SpAf = ifelse(sapply(movie_data$spoken_langu
 movie_data <- movie_data %>% mutate(SpXh = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'xh'))}), 1, 0))
 movie_data <- movie_data %>% mutate(SpZu = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'zu'))}), 1, 0))
 movie_data <- movie_data %>% mutate(SpKn = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'kn'))}), 1, 0))
-any(is.na(movie_data$SpEnglish))
-movie_data[is.na(movie_data$SpEnglish),]$spoken_languages
+movie_data <- movie_data %>% mutate(SpNone = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'zz'))}), 1, 0))
 ```
 
 ```{r}
