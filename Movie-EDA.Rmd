@@ -321,6 +321,11 @@ movie_data <- cbind(movie_data, dummy_companies)
 ```
 
 ```{r}
+# Median imputation for the runtime variable
+movie_data[is.na(movie_data$runtime),]$runtime <- median(movie_data[!is.na(movie_data$runtime),]$runtime)
+```
+
+```{r}
 library(caret)
 head(movie_data)
 nrow(movie_data)
