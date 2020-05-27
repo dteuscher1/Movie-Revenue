@@ -84,6 +84,16 @@ movie_data <- movie_data %>% select(-belongs_to_collection, -homepage, -tagline,
 ```
 
 ```{r}
+# Cast and Crew (counts for each)
+movie_data$cast_count <- sapply(movie_data$cast, function(x){length(unlist(str_extract_all(x,'(?<=\'name\':\\s\').*?(?=\',)')))})
+
+movie_data$crew_count <- sapply(movie_data$crew, function(x){length(unlist(str_extract_all(x,'(?<=\'name\':\\s\').*?(?=\',)')))})
+```
+
+```{r}
+# Original Language
+sum(movie_data$original_language == "en")
+
 # Most of the movies are English, so I'm going to add another indicator variable to specify if the original language was English or not
 movie_data <- movie_data %>% mutate(English = ifelse(original_language == "en", 1, 0))
 
