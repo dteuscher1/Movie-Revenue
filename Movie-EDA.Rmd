@@ -84,14 +84,12 @@ movie_data <- movie_data %>% select(-belongs_to_collection, -homepage, -tagline,
 ```
 
 ```{r}
-# Original Language
-sum(movie_data$original_language == "en")
-
 # Most of the movies are English, so I'm going to add another indicator variable to specify if the original language was English or not
 movie_data <- movie_data %>% mutate(English = ifelse(original_language == "en", 1, 0))
 
 # Drop original langauge column
 movie_data <- movie_data %>% select(-original_language)
+
 ```
 
 ```{r}
@@ -148,6 +146,8 @@ movie_data <- movie_data %>% mutate(SpAf = ifelse(sapply(movie_data$spoken_langu
 movie_data <- movie_data %>% mutate(SpXh = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'xh'))}), 1, 0))
 movie_data <- movie_data %>% mutate(SpZu = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'zu'))}), 1, 0))
 movie_data <- movie_data %>% mutate(SpKn = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'kn'))}), 1, 0))
+any(is.na(movie_data$SpEnglish))
+movie_data[is.na(movie_data$SpEnglish),]$spoken_languages
 ```
 
 ```{r}
@@ -284,27 +284,40 @@ companies_freq
 ```{r}
 library(caret)
 head(movie_data)
-movie_data_1 <- movie_data %>% dplyr::select(-genres, -production_companies, -production_countries, -spoken_languages, -title, -cast, -crew, -genre_list)
-mini <- expand.grid(mtry = 50)
+nrow(movie_data)
+nrow(movie_test)
+nrow(movie_data_1)
+nrow(movie.train)
+movie_data_1 <- movie_data %>% dplyr::select(-genres, -production_companies, -production_countries, -spoken_languages, -title, -cast, -crew, -genre_list, -id, -id1, -runtime)
 custom_summary <- function(data, lev = NULL, model = NULL) {
 out <- Metrics::rmsle(data[, "obs"], data[, "pred"])
 names(out) <- c("rmsle")
 out
 }
+
 movie.train <- movie_data_1[!is.na(movie_data_1$revenue),]
+movie.test <- movie_data_1[is.na(movie_data_1$revenue),]
 myControl <- trainControl(method = "cv",
                           number = 10,
                           summaryFunction = custom_summary)
+
+str(movie.train)
 rf.model <- train(revenue~.,
                   data = movie.train,
-                  method = "rf",
-                  tuneGrid = mini,
+                  method = "ranger",
+                  tuneLength = 2,
                   trControl = myControl,
                   metric = "rmsle",
                   maximize = FALSE,
-                  preProc = "pca")
-head(movie_data)
-apply(movie.train, 2, function(x){any(is.na(x))})
+                  preProcess = c("nzv", "zv", "center", "scale")
+)
+rf.model
 
+# There is something wrong with the predict here 
+preds <- predict(rf.model, newdata = movie.test)
+nrow(movie_data_1[is.na(movie_data_1$revenue),])
+preds[4398] <- mean(preds)
+dat <- data.frame(id = movie_test$id, revenue = preds)
+write_csv(dat, "first-preds.csv")
 ```
 
