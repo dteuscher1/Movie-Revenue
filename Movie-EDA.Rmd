@@ -286,9 +286,25 @@ companies_freq <- tibble(company = companies) %>%
   group_by(company) %>%
   count() %>%
   arrange(desc(n)) %>%
-  filter(n >= 50 & !is.na(company))
-companies_freq
+  ungroup() %>%
+  filter(!is.na(company)) %>%
+  top_n(30, n)
 
+# Create new regular expression for most frequent companies
+company_regex <- paste(companies_freq$company, collapse="|") %>%
+  str_replace_all('([^a-zA-Z0-9 |\\-])', '\\\\\\1')
+
+new_prod_companies <- sapply(movie_data$production_companies, function(x) {
+  unlist(str_extract_all(x, company_regex))
+  })
+
+dummy_companies <- qdapTools::mtabulate(new_prod_companies) 
+colnames(dummy_companies) <- paste0("Comp", gsub("\\W", "", colnames(dummy_companies)))
+
+#n_obs <- nrow(dummy_companies)
+#rownames(dummy_companies) <- 1:n_obs
+
+movie_data <- cbind(movie_data, dummy_companies)
 ```
 
 ```{r}
