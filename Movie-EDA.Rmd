@@ -16,20 +16,15 @@ library(purrr)
 library(lubridate)
 ```
 
-Read in the data
+# Read in the data
+
 ```{r, warning=FALSE}
 movie_train <- read.csv("train.csv", stringsAsFactors = FALSE, na.strings = c("", NA))
 movie_test <- read.csv("test.csv", stringsAsFactors = FALSE, na.strings = c("", NA))
 movie_data <- bind_rows(movie_train, movie_test)
 ```
 
-```{r}
-# Drop some variables that we don't need at all initially
-movie_data <- movie_data %>% dplyr::select(-imdb_id, -original_title, -overview, -poster_path, -status)
-
-# Change release date to a date
-movie_data$release_date <- parse_date_time2(movie_data$release_date, orders = "%m%d%y", cutoff_2000 = 20L)
-```
+## Initial Plots
 
 ```{r}
 # Plots of numeric variables
@@ -42,29 +37,45 @@ missmap(movie_data, col = c("red", "navyblue"))
 plot_missing(movie_data)
 ```
 
-Categorical variables
+# Data Cleaning
+
+## Initial Variable Dropping
+
+Dropping some variables that we don't need at all initially
+
+```{r}
+movie_data <- movie_data %>% select(-imdb_id, -original_title, -overview, -poster_path, -status)
+
+# Change release date to a date
+movie_data$release_date <- parse_date_time2(movie_data$release_date, orders = "%m%d%y", cutoff_2000 = 20L)
+```
+
+## Categorical variables
+
+For each of these features, there is a higher average revenue when not NA than when NA
+
 ```{r}
 # Analyzing features with many NAs
 
-movie_nas <- movie_train[,c("Keywords", "tagline", "homepage", "belongs_to_collection", "revenue")]
-movie_nas <- movie_nas %>% mutate_at(.funs = list(cat = ~ifelse(is.na(.), 0, 1)), .vars = c("Keywords", "tagline", "homepage", "belongs_to_collection"))
+movie_nas <- movie_train %>%
+  select(Keywords, tagline, homepage, belongs_to_collection, revenue) %>%
+  mutate_at(.funs = list(cat = ~ifelse(is.na(.), 0, 1)), 
+            .vars = c("Keywords", "tagline", "homepage",
+                      "belongs_to_collection"))
 
 # Keywords
 mean(movie_nas[movie_nas$Keywords_cat == 1,]$revenue, na.rm = TRUE)
 mean(movie_nas[movie_nas$Keywords_cat == 0,]$revenue, na.rm = TRUE)
-
 boxplot(revenue~Keywords_cat, data = movie_nas)
 
 # Tagline
 mean(movie_nas[movie_nas$tagline_cat == 1,]$revenue)
 mean(movie_nas[movie_nas$tagline_cat == 0,]$revenue)
-
 boxplot(revenue~tagline_cat, data = movie_nas)
 
 # Homepage
 mean(movie_nas[movie_nas$homepage_cat == 1,]$revenue)
 mean(movie_nas[movie_nas$homepage_cat == 0,]$revenue)
-
 boxplot(revenue~homepage_cat, data = movie_nas)
 
 # Collection
@@ -72,15 +83,15 @@ mean(movie_nas[movie_nas$belongs_to_collection_cat == 1,]$revenue)
 mean(movie_nas[movie_nas$belongs_to_collection_cat == 0,]$revenue)
 boxplot(revenue~belongs_to_collection_cat, data = movie_nas)
 
-#
-# For each of these features, there is a higher average revenue when not NA than when NA
-#
-
 # Add indicator columns to main data
-movie_data <- movie_data %>% mutate_at(.funs = list(ind = ~ifelse(is.na(.), 0, 1)), .vars = c("Keywords", "tagline", "homepage", "belongs_to_collection"))
+movie_data <- movie_data %>% 
+  mutate_at(.funs = list(ind = ~ifelse(is.na(.), 0, 1)),
+            .vars = c("Keywords", "tagline", "homepage",
+                      "belongs_to_collection"))
 
 # Drop columns
-movie_data <- movie_data %>% select(-belongs_to_collection, -homepage, -tagline, -Keywords)
+movie_data <- movie_data %>%
+  select(-belongs_to_collection, -homepage, -tagline, -Keywords)
 ```
 
 ```{r}
