@@ -46,6 +46,8 @@ Dropping some variables that we don't need at all initially
 ```{r}
 movie_data <- movie_data %>% select(-imdb_id, -original_title, -overview, -poster_path, -status)
 
+# Insert the release data for the one missing value
+movie_data[is.na(movie_data$release_date),]$release_date <- "05/01/00"
 # Change release date to a date
 movie_data$release_date <- parse_date_time2(movie_data$release_date, orders = "%m%d%y", cutoff_2000 = 20L)
 ```
@@ -102,9 +104,6 @@ movie_data$crew_count <- str_count(movie_data$crew, "'name':\\s'")
 ```
 
 ```{r}
-# Original Language
-sum(movie_data$original_language == "en")
-
 # Most of the movies are English, so I'm going to add another indicator variable to specify if the original language was English or not
 movie_data <- movie_data %>% mutate(English = ifelse(original_language == "en", 1, 0))
 
@@ -331,42 +330,86 @@ movie_data[is.na(movie_data$runtime),]$runtime <- median(movie_data[!is.na(movie
 ```
 
 ```{r}
-library(caret)
-head(movie_data)
-nrow(movie_data)
-nrow(movie_test)
-nrow(movie_data_1)
-nrow(movie.train)
-movie_data_1 <- movie_data %>% dplyr::select(-genres, -production_companies, -production_countries, -spoken_languages, -title, -cast, -crew, -genre_list, -id, -id1, -runtime)
+movie_data_1 <- movie_data %>% dplyr::select(-id, -genres, -production_companies, -production_countries, -spoken_languages, -title, -cast, -crew, -genre_list, -id1, -crew_count)
 custom_summary <- function(data, lev = NULL, model = NULL) {
 out <- Metrics::rmsle(data[, "obs"], data[, "pred"])
 names(out) <- c("rmsle")
 out
 }
 
-movie.train <- movie_data_1[!is.na(movie_data_1$revenue),]
-movie.test <- movie_data_1[is.na(movie_data_1$revenue),]
+movie.train <- movie_data_1[!is.na(movie_data_1$revenue),] %>% dplyr::select(-revenue)
+movie.test <- movie_data_1[is.na(movie_data_1$revenue),] %>% dplyr::select(-revenue)
 myControl <- trainControl(method = "cv",
                           number = 10,
                           summaryFunction = custom_summary)
+train <- preProcess(movie.train, method = c("nzv", "zv", "pca"))
+test <- preProcess(movie.test, method = c("nzv", "zv", "pca"))
+movie.train <- predict(train, movie.train)
+movie.test <- predict(test, movie.test)
 
-str(movie.train)
-rf.model <- train(revenue~.,
+movie.train <- movie.train %>% mutate(revenue = movie_data_1$revenue[!is.na(movie_data_1$revenue)])
+movie.test <- movie.test %>% mutate(revenue = movie_data_1$revenue[is.na(movie_data_1$revenue)])
+
+
+# Random forest
+model <- train(log(revenue)~.,
                   data = movie.train,
                   method = "ranger",
-                  tuneLength = 2,
+                  tuneLength = 5,
                   trControl = myControl,
                   metric = "rmsle",
                   maximize = FALSE,
                   preProcess = c("nzv", "zv", "center", "scale")
 )
-rf.model
+model
 
-# There is something wrong with the predict here 
-preds <- predict(rf.model, newdata = movie.test)
-nrow(movie_data_1[is.na(movie_data_1$revenue),])
-preds[4398] <- mean(preds)
+preds <- predict(model, newdata = movie.test) %>% exp()
 dat <- data.frame(id = movie_test$id, revenue = preds)
-write_csv(dat, "first-preds.csv")
+write_csv(dat, "log-rf-preds.csv")
+
+# Glmnet
+model2 <- train(log(revenue)~.,
+                data = movie.train,
+                method = "glmnet",
+                tuneLength = 10,
+                trControl = myControl,
+                metric ="rmsle",
+                maximize = FALSE,
+                preProcess = c("nzv", "zv", "center", "scale"))
+model2
+
+preds <- predict(model2, newdata = movie.test) %>% exp()
+dat <- data.frame(id = movie_test$id, revenue = preds)
+write_csv(dat, "glmnet-preds.csv")
+
+# Bagged MARS
+model3 <- train(log(revenue)~.,
+                data = movie.train,
+                method = "bagEarth",
+                tuneLength = 5,
+                trControl = myControl,
+                metric ="rmsle",
+                maximize = FALSE,
+                preProcess = c("nzv", "zv", "center", "scale"))
+model3
+
+preds <- predict(model3, newdata = movie.test) %>% exp()
+dat <- data.frame(id = movie_test$id, revenue = preds)
+write_csv(dat, "mars-preds.csv")
+
+# SVM
+model4 <- train(log(revenue)~.,
+                data = movie.train,
+                method = "svmRadial",
+                tuneLength = 5,
+                trControl = myControl,
+                metric ="rmsle",
+                maximize = FALSE,
+                preProcess = c("nzv", "zv", "center", "scale"))
+model4
+
+preds <- predict(model4, newdata = movie.test) %>% exp()
+dat <- data.frame(id = movie_test$id, revenue = preds)
+write_csv(dat, "svm-preds.csv")
 ```
 
