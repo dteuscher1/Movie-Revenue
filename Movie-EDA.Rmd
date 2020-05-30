@@ -10,119 +10,175 @@ library(caret)
 library(Amelia)
 library(stringr)
 library(DataExplorer)
+library(fastDummies)
+library(forcats)
+library(purrr)
+library(lubridate)
 ```
 
-Read in the data
+# Read in the data
+
 ```{r, warning=FALSE}
 movie_train <- read.csv("train.csv", stringsAsFactors = FALSE, na.strings = c("", NA))
 movie_test <- read.csv("test.csv", stringsAsFactors = FALSE, na.strings = c("", NA))
-head(movie_test)
 movie_data <- bind_rows(movie_train, movie_test)
 ```
 
-
-```{r}
-str(movie_data) # Well some of these variables don't look like fun; belongs to collection, genres, production companies, production countries and so forth
-
-movie_data$release_date <- as.Date(movie_data$release_date, format = "%m/%d/%y")
-head(movie_data$release_date)
-```
-
+## Initial Plots
 
 ```{r}
 # Plots of numeric variables
-ggplot(movie_data, aes(x=popularity, y = revenue)) + geom_point() + geom_smooth(method = "loess", se = FALSE) + xlim(0, 300)
-ggplot(movie_data, aes(x=runtime, y = revenue)) + geom_point() + geom_smooth(method = "loess", se = FALSE)
-ggplot(movie_data, aes(x=budget, y = revenue)) + geom_point() + geom_smooth(method = "loess", se = FALSE)
+ggplot(movie_data, aes(x = popularity, y = revenue)) + geom_point() + geom_smooth(method = "loess", se = FALSE) + xlim(0, 300)
+ggplot(movie_data, aes(x = runtime, y = revenue)) + geom_point() + geom_smooth(method = "loess", se = FALSE)
+ggplot(movie_data, aes(x = budget, y = revenue)) + geom_point() + geom_smooth(method = "loess", se = FALSE)
 
 # Plot of how many values are missing
 missmap(movie_data, col = c("red", "navyblue"))
 plot_missing(movie_data)
 ```
 
-Categorical variables
+# Data Cleaning
+
+## Initial Variable Dropping
+
+Dropping some variables that we don't need at all initially
+
 ```{r}
-# The categorical variables will be more difficult to deal with 
-# Belongs to a collection
-sum(is.na(movie_data$belongs_to_collection))
-nrow(movie_data)
+movie_data <- movie_data %>% select(-imdb_id, -original_title, -overview, -poster_path, -status)
 
-# It seems that most movies don't belong to a collection, so I'm going to create an indicator variable to specify if a movie belongs to a collection or not
-movie_data <- movie_data %>% mutate(Collection = ifelse(is.na(belongs_to_collection), 0, 1))
+# Insert the release data for the one missing value
+movie_data[is.na(movie_data$release_date),]$release_date <- "05/01/00"
+# Change release date to a date
+movie_data$release_date <- parse_date_time2(movie_data$release_date, orders = "%m%d%y", cutoff_2000 = 20L)
+```
 
-# Original Language
-sum(movie_data$original_language == "en")
+## Categorical variables
 
+For each of these features, there is a higher average revenue when not NA than when NA
+
+```{r}
+# Analyzing features with many NAs
+
+movie_nas <- movie_train %>%
+  select(Keywords, tagline, homepage, belongs_to_collection, revenue) %>%
+  mutate_at(.funs = list(cat = ~ifelse(is.na(.), 0, 1)), 
+            .vars = c("Keywords", "tagline", "homepage",
+                      "belongs_to_collection"))
+
+# Keywords
+mean(movie_nas[movie_nas$Keywords_cat == 1,]$revenue, na.rm = TRUE)
+mean(movie_nas[movie_nas$Keywords_cat == 0,]$revenue, na.rm = TRUE)
+boxplot(revenue~Keywords_cat, data = movie_nas)
+
+# Tagline
+mean(movie_nas[movie_nas$tagline_cat == 1,]$revenue)
+mean(movie_nas[movie_nas$tagline_cat == 0,]$revenue)
+boxplot(revenue~tagline_cat, data = movie_nas)
+
+# Homepage
+mean(movie_nas[movie_nas$homepage_cat == 1,]$revenue)
+mean(movie_nas[movie_nas$homepage_cat == 0,]$revenue)
+boxplot(revenue~homepage_cat, data = movie_nas)
+
+# Collection
+mean(movie_nas[movie_nas$belongs_to_collection_cat == 1,]$revenue)
+mean(movie_nas[movie_nas$belongs_to_collection_cat == 0,]$revenue)
+boxplot(revenue~belongs_to_collection_cat, data = movie_nas)
+
+# Add indicator columns to main data
+movie_data <- movie_data %>% 
+  mutate_at(.funs = list(ind = ~ifelse(is.na(.), 0, 1)),
+            .vars = c("Keywords", "tagline", "homepage",
+                      "belongs_to_collection"))
+
+# Drop columns
+movie_data <- movie_data %>%
+  select(-belongs_to_collection, -homepage, -tagline, -Keywords)
+```
+
+## Cast and Crew (counts for each)
+
+```{r}
+movie_data$cast_count <- str_count(movie_data$cast, "'name':\\s'")
+movie_data$crew_count <- str_count(movie_data$crew, "'name':\\s'")
+```
+
+```{r}
 # Most of the movies are English, so I'm going to add another indicator variable to specify if the original language was English or not
 movie_data <- movie_data %>% mutate(English = ifelse(original_language == "en", 1, 0))
 
-# For the others, we are likely going to have to use regular expressions to get information out of it I believe
+# Drop original langauge column
+movie_data <- movie_data %>% select(-original_language)
+
+```
+
+### Function to extract useful data
+
+```{r}
+extract_n_most_freq_to_dummy <- function(vect, pattern, name, n_most_pattern_fun, n_most_freq=NULL) {
+  
+  # Get all vars into a usable list
+  var_extractor <- function(x) {
+      unlist(str_extract_all(x, pattern=pattern))
+  }
+  
+  if(!is.null(n_most_freq)) {
+    n_most_freq <- n_most_freq
+    extracted_vars <- lapply(vect, var_extractor) %>%
+      unlist()
+    
+    # Find n most frequently appearing vars
+    var_freq <- tibble(var = extracted_vars) %>%
+      group_by(var) %>%
+      count() %>%
+      arrange(desc(n)) %>%
+      ungroup() %>%
+      filter(!is.na(var)) %>%
+      top_n(n_most_freq, n)
+    
+    # Create new regular expression for most frequently occuring vars
+    var_regex <- n_most_pattern_fun(var_freq$var)
+    # var_regex <- paste(var_freq$var, collapse="|") %>%
+    #   str_replace_all('([^a-zA-Z0-9 |\\-])', '\\\\\\1')
+    
+    new_vars <- sapply(vect, function(x) {
+      unlist(str_extract_all(x, var_regex))
+      })
+    
+    dummy_vars <- qdapTools::mtabulate(new_vars) 
+  }
+  else {
+    extracted_vars <- sapply(vect, var_extractor)
+    dummy_vars <- qdapTools::mtabulate(extracted_vars)
+  }
+  
+  colnames(dummy_vars) <- paste0(name, gsub("\\W", "", colnames(dummy_vars)))
+  rownames(dummy_vars) <- 1:nrow(dummy_vars)
+  
+  return(dummy_vars)
+}
+```
+
+## Spoken Languages
+
+```{r}
+pattern <- "(?<=')[:lower:]{2}(?=')"
+pattern_fun <- function(x) {
+  paste(x, collapse="|") %>%
+    paste0("(?<=')(", ., ")")
+}
+name <- 'Sp_'
+n <- 7
+
+dummy_sp <- extract_n_most_freq_to_dummy(movie_data$spoken_languages, pattern, name, pattern_fun, n)
+
+movie_data <- cbind(movie_data, dummy_sp)
 ```
 
 ```{r}
-# Pulling out just the abbreviations
-movie_data$spoken_languages <- sapply(movie_data$spoken_languages, function(x){unlist(str_extract_all(x, '(?<=\')[:lower:]{2}(?=\')'))})
-```
-
-```{r}
-head(movie_data$spoken_languages)
-```
-
-```{r}
-movie_data <- movie_data %>% mutate(SpEnglish = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'en'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpArabic = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'ar'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpKorean = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'ko'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpJapanese = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'ja'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpRussian = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'ru'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpFrench = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'fr'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpItalian = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'it'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpGerman = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'de'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpSpanish = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'es'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpPortugese = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'pt'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpHi = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'hi'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpZh = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'zh'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpLa = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'la'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpHe = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'he'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpQu = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'qu'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpTr = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'tr'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpTa = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'ta'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpTe = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'te'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpCn = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'cn'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpGd = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'gd'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpSv = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'sv'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpCs = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'cs'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpHu = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'hu'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpGa = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'ga'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpEl = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'el'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpPl = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'pl'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpTl = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'tl'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpTh = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'th'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpNo = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'no'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpDa = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'da'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpNl = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'nl'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpSr = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'sr'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpFa = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'fa'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpXx = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'xx'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpFi = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'fi'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpUr = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'ur'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpAm = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'am'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpMi = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'mi'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpMl = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'ml'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpBn = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'bn'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpRo = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'ro'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpIu = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'iu'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpId = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'id'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpMr = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'mr'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpAf = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'af'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpXh = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'xh'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpZu = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'zu'))}), 1, 0))
-movie_data <- movie_data %>% mutate(SpKn = ifelse(sapply(movie_data$spoken_languages, function(x){any(str_detect(x, 'kn'))}), 1, 0))
-```
-
-```{r}
-# Ok this isn't the most efficient way but it works
-# Created a variable for total number of languages spoken in a film (Num_Languages)
-movie_data$Num_Languages <- movie_data$SpAf + movie_data$SpAm + movie_data$SpArabic + movie_data$SpBn + movie_data$SpCn + movie_data$SpCs + movie_data$SpDa + movie_data$SpEl + movie_data$SpEnglish + movie_data$SpFa + movie_data$SpFi + movie_data$SpFrench + movie_data$SpGa + movie_data$SpGd + movie_data$SpGerman + movie_data$SpHe + movie_data$SpHi + movie_data$SpHu + movie_data$SpId + movie_data$SpItalian + movie_data$SpIu + movie_data$SpJapanese + movie_data$SpKn + movie_data$SpKorean + movie_data$SpLa + movie_data$SpMi + movie_data$SpMl + movie_data$SpMr + movie_data$SpNl + movie_data$SpNo + movie_data$SpPl + movie_data$SpPortugese + movie_data$SpQu + movie_data$SpRo + movie_data$SpRussian + movie_data$SpSpanish + movie_data$SpSr + movie_data$SpSv + movie_data$SpTa + movie_data$SpTe + movie_data$SpTh + movie_data$SpTl + movie_data$SpTr + movie_data$SpUr + movie_data$SpXh + movie_data$SpXx + movie_data$SpZh + movie_data$SpZu
+movie_data$Num_Languages <- movie_data %>%
+  select(Sp_de:Sp_ru) %>%
+  rowSums()
 ```
 
 ```{r}
@@ -172,61 +228,201 @@ movie_data$num_genres <- movie_data %>% select(GenreAction:GenreWestern) %>% row
 # movie_data <- cbind(movie_data, dv)
 ```
 
+<<<<<<< HEAD
 ```{r}
 #Production Countries
 head(movie_data)
 head(movie_data$production_countries,33)
 movie_data$production_countries[72]
 str_extract_all(movie_data$production_countries, pattern = "[:upper:][:upper:]")
-separated <- separate(movie_data, production_countries, sep = "\\}, \\{", into = c("Country1", "Country2", "Country3", "Country4", "Country5", "Country6", "Country7", "Country8", "Country9", "Country10", "Country11", "Country12"))
-head(separated)
+=======
+```
 
+```{r country}
+# Split apart all of the countries into a separate column
+>>>>>>> 738ed8b77074956705de1794c9e4fd9b8e512d5c
+separated <- separate(movie_data, production_countries, sep = "\\}, \\{", into = c("Country1", "Country2", "Country3", "Country4", "Country5", "Country6", "Country7", "Country8", "Country9", "Country10", "Country11", "Country12"))
+
+# Function to extract the country name from the json formatted text
 country_name <- function(x) {
     str_extract(x, pattern = "(?<=name': ')[A-Za-z\\s]+")
 }
-library(purrr)
-test <- separated %>% select(Country1:Country12) %>% map_df(~country_name(.))
-test
+
+# Apply the function to get the country name to all twelve country columns
+countries <- separated %>% select(Country1:Country12) %>% map_df(~country_name(.)) %>% bind_cols(id = separated$id)
+
+# Change any countries that have no production company to none
+countries$Country1[is.na(countries$Country1)] <- "None"
+
+# Reshape the data to long format to make country into a factor
+countries_long <- countries %>% pivot_longer(Country1:Country12, names_to = "CountryNumber", values_to = "Country", values_drop_na = TRUE)
+
+# Summarizes the number of movies for each country
+Country_summary <- countries_long %>% 
+  group_by(Country) %>%
+  summarize(count = n()) %>% 
+  arrange(desc(count))
+
+# Changes countries to a factor. Any country that has less than 100 movies produced there is clumped in the other group
+countries_fct <- countries_long %>% 
+  mutate(Country = factor(Country),
+         Country = fct_lump_min(Country, min = 100, other_level = "Other"))
+
+# Make dummy variables for each country remained (and the None and Other groups)
+dummy_many <- countries_fct %>% dummy_cols(select_columns = "Country")
+
+# Combined the multiple observations into a single observation for each row
+# Variables are now ready to be included in the model. 
+country_dummies <- dummy_many %>% group_by(id) %>% mutate(Country_Australia = sum(Country_Australia),
+                                       Country_Canada = sum(Country_Canada),
+                                       Country_France = sum(Country_France),
+                                       Country_Germany = sum(Country_Germany),
+                                       Country_India = sum(Country_India),
+                                       Country_Italy = sum(Country_Italy),
+                                       Country_Japan = sum(Country_Japan),
+                                       Country_Other = sum(Country_Other),
+                                       Country_Russia = sum(Country_Russia),
+                                       Country_Spain = sum(Country_Spain),
+                                       `Country_United Kingdom` = sum(`Country_United Kingdom`),
+                                       `Country_United States of America` = sum(`Country_United States of America`),
+                                       Country_None = sum(Country_None)) %>% 
+                                  distinct(id, .keep_all = TRUE) %>% 
+                                  dplyr::select(-CountryNumber, -Country)
+movie_data <- movie_data %>% bind_cols(country_dummies)
+```
+
+
+
+
+```{r}
+# Clean production company data
+pattern_fun <- function(x) {
+  paste(x, collapse="|") %>%
+      str_replace_all('([^a-zA-Z0-9 |\\-])', '\\\\\\1')
+}
+
+# Get all companies into a usable list
+company_name <- function(x) {
+    result <- unlist(str_extract_all(x, pattern = "(?<=name': ')[^']+"))
+    result
+}
+companies <- lapply(movie_data$production_companies, company_name) %>%
+  unlist()
+
+# Find most frequently appearing companies
+companies_freq <- tibble(company = companies) %>%
+  group_by(company) %>%
+  count() %>%
+  arrange(desc(n)) %>%
+  ungroup() %>%
+  filter(!is.na(company)) %>%
+  top_n(30, n)
+
+# Create new regular expression for most frequent companies
+company_regex <- paste(companies_freq$company, collapse="|") %>%
+  str_replace_all('([^a-zA-Z0-9 |\\-])', '\\\\\\1')
+
+new_prod_companies <- sapply(movie_data$production_companies, function(x) {
+  unlist(str_extract_all(x, company_regex))
+  })
+
+dummy_companies <- qdapTools::mtabulate(new_prod_companies) 
+colnames(dummy_companies) <- paste0("Comp", gsub("\\W", "", colnames(dummy_companies)))
+
+n_obs <- nrow(dummy_companies)
+rownames(dummy_companies) <- 1:n_obs
+
+movie_data <- cbind(movie_data, dummy_companies)
 ```
 
 ```{r}
-# Analyzing features with many NAs
-
-movie_nas <- movie_train[,c("Keywords", "tagline", "homepage", "belongs_to_collection", "revenue")]
-movie_nas <- movie_nas %>% mutate_at(.funs = list(cat = ~ifelse(is.na(.), 0, 1)), .vars=c("Keywords", "tagline", "homepage", "belongs_to_collection"))
-
-# Keywords
-mean(movie_nas[movie_nas$Keywords_cat==1,]$revenue)
-mean(movie_nas[movie_nas$Keywords_cat==0,]$revenue)
-
-boxplot(revenue~Keywords_cat, data=movie_nas)
-
-# Tagline
-mean(movie_nas[movie_nas$tagline_cat==1,]$revenue)
-mean(movie_nas[movie_nas$tagline_cat==0,]$revenue)
-
-boxplot(revenue~tagline_cat, data=movie_nas)
-
-# Homepage
-mean(movie_nas[movie_nas$homepage_cat==1,]$revenue)
-mean(movie_nas[movie_nas$homepage_cat==0,]$revenue)
-
-boxplot(revenue~homepage_cat, data=movie_nas)
-
-# Collection
-mean(movie_nas[movie_nas$belongs_to_collection_cat==1,]$revenue)
-mean(movie_nas[movie_nas$belongs_to_collection_cat==0,]$revenue)
-
-boxplot(revenue~belongs_to_collection_cat, data=movie_nas)
-
-#
-# For each of these features, there is a higher average revenue when not NA than when NA
-#
-
-# Add indicator columns to main data
-movie_data <- movie_data %>% mutate_at(.funs = list(ind = ~ifelse(is.na(.), 0, 1)), .vars=c("Keywords", "tagline", "homepage", "belongs_to_collection"))
+# Median imputation for the runtime variable
+movie_data[is.na(movie_data$runtime),]$runtime <- median(movie_data[!is.na(movie_data$runtime),]$runtime)
 ```
 
+```{r}
+movie_data_1 <- movie_data %>% dplyr::select(-id, -genres, -production_companies, -production_countries, -spoken_languages, -title, -cast, -crew, -genre_list, -id1, -crew_count)
+custom_summary <- function(data, lev = NULL, model = NULL) {
+out <- Metrics::rmsle(data[, "obs"], data[, "pred"])
+names(out) <- c("rmsle")
+out
+}
+
+movie.train <- movie_data_1[!is.na(movie_data_1$revenue),] %>% dplyr::select(-revenue)
+movie.test <- movie_data_1[is.na(movie_data_1$revenue),] %>% dplyr::select(-revenue)
+myControl <- trainControl(method = "cv",
+                          number = 10,
+                          summaryFunction = custom_summary)
+train <- preProcess(movie.train, method = c("nzv", "zv", "pca"))
+test <- preProcess(movie.test, method = c("nzv", "zv", "pca"))
+movie.train <- predict(train, movie.train)
+movie.test <- predict(test, movie.test)
+
+movie.train <- movie.train %>% mutate(revenue = movie_data_1$revenue[!is.na(movie_data_1$revenue)])
+movie.test <- movie.test %>% mutate(revenue = movie_data_1$revenue[is.na(movie_data_1$revenue)])
+
+
+# Random forest
+model <- train(log(revenue)~.,
+                  data = movie.train,
+                  method = "ranger",
+                  tuneLength = 5,
+                  trControl = myControl,
+                  metric = "rmsle",
+                  maximize = FALSE,
+                  preProcess = c("nzv", "zv", "center", "scale")
+)
+model
+
+preds <- predict(model, newdata = movie.test) %>% exp()
+dat <- data.frame(id = movie_test$id, revenue = preds)
+write_csv(dat, "log-rf-preds.csv")
+
+# Glmnet
+model2 <- train(log(revenue)~.,
+                data = movie.train,
+                method = "glmnet",
+                tuneLength = 10,
+                trControl = myControl,
+                metric ="rmsle",
+                maximize = FALSE,
+                preProcess = c("nzv", "zv", "center", "scale"))
+model2
+
+preds <- predict(model2, newdata = movie.test) %>% exp()
+dat <- data.frame(id = movie_test$id, revenue = preds)
+write_csv(dat, "glmnet-preds.csv")
+
+# Bagged MARS
+model3 <- train(log(revenue)~.,
+                data = movie.train,
+                method = "bagEarth",
+                tuneLength = 5,
+                trControl = myControl,
+                metric ="rmsle",
+                maximize = FALSE,
+                preProcess = c("nzv", "zv", "center", "scale"))
+model3
+
+preds <- predict(model3, newdata = movie.test) %>% exp()
+dat <- data.frame(id = movie_test$id, revenue = preds)
+write_csv(dat, "mars-preds.csv")
+
+# SVM
+model4 <- train(log(revenue)~.,
+                data = movie.train,
+                method = "svmRadial",
+                tuneLength = 5,
+                trControl = myControl,
+                metric ="rmsle",
+                maximize = FALSE,
+                preProcess = c("nzv", "zv", "center", "scale"))
+model4
+
+preds <- predict(model4, newdata = movie.test) %>% exp()
+dat <- data.frame(id = movie_test$id, revenue = preds)
+write_csv(dat, "svm-preds.csv")
+```
 
 ```{r}
 #eliminating unnecessary variables
