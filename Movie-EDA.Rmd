@@ -24,6 +24,8 @@ movie_test <- read.csv("test.csv", stringsAsFactors = FALSE, na.strings = c("", 
 movie_data <- bind_rows(movie_train, movie_test)
 
 colnames(movie_data)[1] <- "id"
+colnames(movie_train)[1] <- "id"
+colnames(movie_test)[1] <- "id"
 ```
 
 ## Initial Plots
@@ -417,6 +419,43 @@ preds <- predict(model4, newdata = movie.test) %>% exp()
 dat <- data.frame(id = movie_test$id, revenue = preds)
 write_csv(dat, "svm-preds.csv")
 ```
+
+```{r}
+# Gradient Boosting Forest (2.07568 score)
+
+movie_data_1 <- movie_data %>% dplyr::select(-id, -genres, -production_companies, -production_countries, -spoken_languages, -title, -cast, -crew, -id1, -crew_count)
+custom_summary <- function(data, lev = NULL, model = NULL) {
+out <- Metrics::rmsle(data[, "obs"], data[, "pred"])
+names(out) <- c("rmsle")
+out
+}
+
+movie.train <- movie_data_1[!is.na(movie_data_1$revenue),] %>% dplyr::select(-revenue)
+movie.test <- movie_data_1[is.na(movie_data_1$revenue),] %>% dplyr::select(-revenue)
+myControl <- trainControl(method = "cv",
+                          number = 3,
+                          summaryFunction = custom_summary)
+
+movie.train <- movie.train %>% mutate(revenue = movie_data_1$revenue[!is.na(movie_data_1$revenue)])
+movie.test <- movie.test %>% mutate(revenue = movie_data_1$revenue[is.na(movie_data_1$revenue)])
+
+grid <- expand.grid("n.trees"=500, "interaction.depth"=4, "shrinkage"=0.1, "n.minobsinnode"=20)
+
+rfb.mod <- train(log(revenue)~.,
+                 data=movie.train,
+                 method="gbm",
+                 tuneGrid=grid,
+                 trControl=myControl,
+                 metric = "rmsle",
+                 verbose=F,
+                 preProcess = c("nzv", "zv", "center", "scale")
+                 )
+
+preds <- predict(rfb.mod, newdata = movie.test) %>% exp()
+dat <- data.frame(id = movie_test$id, revenue = preds)
+write_csv(dat, "rf-gboost-preds.csv")
+```
+
 
 ```{r}
 #eliminating unnecessary variables
