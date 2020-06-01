@@ -22,6 +22,8 @@ library(lubridate)
 movie_train <- read.csv("train.csv", stringsAsFactors = FALSE, na.strings = c("", NA))
 movie_test <- read.csv("test.csv", stringsAsFactors = FALSE, na.strings = c("", NA))
 movie_data <- bind_rows(movie_train, movie_test)
+
+colnames(movie_data)[1] <- "id"
 ```
 
 ## Initial Plots
@@ -228,19 +230,11 @@ movie_data$num_genres <- movie_data %>% select(GenreAction:GenreWestern) %>% row
 # movie_data <- cbind(movie_data, dv)
 ```
 
-<<<<<<< HEAD
-```{r}
-#Production Countries
-head(movie_data)
-head(movie_data$production_countries,33)
-movie_data$production_countries[72]
-str_extract_all(movie_data$production_countries, pattern = "[:upper:][:upper:]")
-=======
-```
+
 
 ```{r country}
 # Split apart all of the countries into a separate column
->>>>>>> 738ed8b77074956705de1794c9e4fd9b8e512d5c
+# >>>>>>> 738ed8b77074956705de1794c9e4fd9b8e512d5c
 separated <- separate(movie_data, production_countries, sep = "\\}, \\{", into = c("Country1", "Country2", "Country3", "Country4", "Country5", "Country6", "Country7", "Country8", "Country9", "Country10", "Country11", "Country12"))
 
 # Function to extract the country name from the json formatted text
