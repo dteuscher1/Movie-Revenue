@@ -356,8 +356,9 @@ movie.test <- predict(test, movie.test)
 
 movie.train <- movie.train %>% mutate(revenue = movie_data_1$revenue[!is.na(movie_data_1$revenue)])
 movie.test <- movie.test %>% mutate(revenue = movie_data_1$revenue[is.na(movie_data_1$revenue)])
+```
 
-
+```{r}
 # Random forest
 model <- train(log(revenue)~.,
                   data = movie.train,
@@ -373,7 +374,9 @@ model
 preds <- predict(model, newdata = movie.test) %>% exp()
 dat <- data.frame(id = movie_test$id, revenue = preds)
 write_csv(dat, "log-rf-preds.csv")
+```
 
+```{r}
 # Glmnet
 model2 <- train(log(revenue)~.,
                 data = movie.train,
@@ -388,7 +391,9 @@ model2
 preds <- predict(model2, newdata = movie.test) %>% exp()
 dat <- data.frame(id = movie_test$id, revenue = preds)
 write_csv(dat, "glmnet-preds.csv")
+```
 
+```{r}
 # Bagged MARS
 model3 <- train(log(revenue)~.,
                 data = movie.train,
@@ -403,7 +408,9 @@ model3
 preds <- predict(model3, newdata = movie.test) %>% exp()
 dat <- data.frame(id = movie_test$id, revenue = preds)
 write_csv(dat, "mars-preds.csv")
+```
 
+```{r}
 # SVM
 model4 <- train(log(revenue)~.,
                 data = movie.train,
