@@ -432,6 +432,40 @@ write_csv(dat, "svm-preds.csv")
 ```
 
 ```{r}
+# tuning ranger (2.15475 score)
+movie_data_1 <- movie_data %>% dplyr::select(-id, -genres, -production_companies, -production_countries, -spoken_languages, -title, -cast, -crew, -id1, -crew_count)
+custom_summary <- function(data, lev = NULL, model = NULL) {
+  out <- Metrics::rmsle(data[, "obs"], data[, "pred"])
+  names(out) <- c("rmsle")
+  out
+}
+
+movie.train <- movie_data_1[!is.na(movie_data_1$revenue),] %>% dplyr::select(-revenue)
+movie.test <- movie_data_1[is.na(movie_data_1$revenue),] %>% dplyr::select(-revenue)
+grid <- expand.grid("mtry" = c(20, 25, 30), "splitrule" = "extratrees", min.node.size = c(1, 3, 5))
+movie.train <- movie.train %>% mutate(revenue = movie_data_1$revenue[!is.na(movie_data_1$revenue)])
+movie.test <- movie.test %>% mutate(revenue = movie_data_1$revenue[is.na(movie_data_1$revenue)])
+
+model.rf2 <- train(log(revenue)~.,
+                  data = movie.train,
+                  method = "ranger",
+                  tuneGrid = grid,
+                  trControl = myControl,
+                  metric = "rmsle",
+                  maximize = FALSE,
+                  preProcess = c("nzv", "zv", "center", "scale")
+)
+
+model.rf2
+
+preds.rf2 <- predict(model.rf2, newdata = movie.test) %>% exp()
+rf.dat2 <- data.frame(id = movie_test[,1], revenue = preds.rf2)
+write_csv(rf.dat2, path = "rf_nopca2.csv")
+
+```
+
+
+```{r}
 # Gradient Boosting Forest (2.07568 score)
 
 movie_data_1 <- movie_data %>% dplyr::select(-id, -genres, -production_companies, -production_countries, -spoken_languages, -title, -cast, -crew, -id1, -crew_count)
