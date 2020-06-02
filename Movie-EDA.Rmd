@@ -363,6 +363,31 @@ movie.test <- movie.test %>% mutate(revenue = movie_data_1$revenue[is.na(movie_d
 ```
 
 ```{r}
+tunegrid <- expand.grid(nrounds = c(40, 50, 60),
+                        lambda = c(0, .01, .025),
+                        alpha = c(0, .01, .025),
+                        eta = c(.2, .3, .4))
+
+xgbLinear.model <- train(log(revenue)~.,
+                   data = movie.train,
+                   method = "xgbLinear",
+                   tuneGrid = tunegrid,
+                   trControl = myControl,
+                   metric = "rmsle",
+                   maximize = FALSE
+                  #preProcess = c("nzv", "zv", "center", "scale")
+)
+xgbLinear.model
+```
+
+```{r}
+preds <- predict(xgbLinear.model, newdata = movie.test) %>% exp()
+dat <- data.frame(id = movie_test$id, revenue = preds)
+write_csv(dat, "xgbLinear-preds.csv")
+```
+
+
+```{r}
 # Random forest
 model <- train(log(revenue)~.,
                   data = movie.train,
