@@ -337,6 +337,10 @@ movie_data[is.na(movie_data$runtime),]$runtime <- median(movie_data[!is.na(movie
 ```
 
 ```{r}
+# Had dto rename these columns to get things to run
+names(movie_data)[1] <- "id"
+names(movie_data)[50] <- "id1"
+
 movie_data_1 <- movie_data %>% dplyr::select(-id, -genres, -production_companies, -production_countries, -spoken_languages, -title, -cast, -crew, -id1, -crew_count)
 custom_summary <- function(data, lev = NULL, model = NULL) {
 out <- Metrics::rmsle(data[, "obs"], data[, "pred"])
