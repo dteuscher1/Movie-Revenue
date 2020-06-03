@@ -381,13 +381,6 @@ xgbLinear.model
 ```
 
 ```{r}
-preds <- predict(xgbLinear.model, newdata = movie.test) %>% exp()
-dat <- data.frame(id = movie_test$id, revenue = preds)
-write_csv(dat, "xgbLinear-preds.csv")
-```
-
-
-```{r}
 # Random forest
 model <- train(log(revenue)~.,
                   data = movie.train,
@@ -524,6 +517,46 @@ rfb.mod <- train(log(revenue)~.,
 preds <- predict(rfb.mod, newdata = movie.test) %>% exp()
 dat <- data.frame(id = movie_test$id, revenue = preds)
 write_csv(dat, "rf-gboost-preds.csv")
+```
+
+```{r}
+# Gradient Boosting Forest (2.07568 score)
+
+movie_data_1 <- movie_data %>% dplyr::select(-id, -genres, -production_companies, -production_countries, -spoken_languages, -title, -cast, -crew, -id1, -crew_count)
+custom_summary <- function(data, lev = NULL, model = NULL) {
+out <- Metrics::rmsle(data[, "obs"], data[, "pred"])
+names(out) <- c("rmsle")
+out
+}
+
+movie.train <- movie_data_1[!is.na(movie_data_1$revenue),] %>% dplyr::select(-revenue)
+movie.test <- movie_data_1[is.na(movie_data_1$revenue),] %>% dplyr::select(-revenue)
+myControl <- trainControl(method = "cv",
+                          number = 3,
+                          summaryFunction = custom_summary)
+
+movie.train <- movie.train %>% mutate(revenue = movie_data_1$revenue[!is.na(movie_data_1$revenue)])
+movie.test <- movie.test %>% mutate(revenue = movie_data_1$revenue[is.na(movie_data_1$revenue)])
+
+tunegrid <- expand.grid(nrounds = 60,
+                        lambda = .01,
+                        alpha = .01,
+                        eta = .2)
+
+xgbLinear.model <- train(log(revenue)~.,
+                   data = movie.train,
+                   method = "xgbLinear",
+                   tuneGrid = tunegrid,
+                   trControl = myControl,
+                   metric = "rmsle",
+                   maximize = FALSE
+                  #preProcess = c("nzv", "zv", "center", "scale")
+)
+xgbLinear.model
+
+preds <- predict(xgbLinear.model, newdata = movie.test) %>% exp()
+dat <- data.frame(id = movie_test$id, revenue = preds)
+write_csv(dat, "xgbLinear-preds.csv")
 ```
 
 
