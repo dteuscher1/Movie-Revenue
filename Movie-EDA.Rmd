@@ -520,7 +520,7 @@ write_csv(dat, "rf-gboost-preds.csv")
 ```
 
 ```{r}
-# Gradient Boosting Forest (2.07568 score)
+# xgbLinear (2.1869 score)
 
 movie_data_1 <- movie_data %>% dplyr::select(-id, -genres, -production_companies, -production_countries, -spoken_languages, -title, -cast, -crew, -id1, -crew_count)
 custom_summary <- function(data, lev = NULL, model = NULL) {
