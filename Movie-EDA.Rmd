@@ -559,6 +559,31 @@ dat <- data.frame(id = movie_test$id, revenue = preds)
 write_csv(dat, "xgbLinear-preds.csv")
 ```
 
+```{r}
+# xgbTree (2.09998 score) 
+tunegrid <- expand.grid(eta = .25,
+                        max_depth = 3,
+                        colsample_bytree = .9,
+                        subsample = .8,
+                        nrounds = 100,
+                        min_child_weight = 1,
+                        gamma = .075)
+
+xgbTree.model <- train(log(revenue)~.,
+                   data = movie.train,
+                   method = "xgbTree",
+                   tuneGrid = tunegrid,
+                   trControl = myControl,
+                   metric = "rmsle",
+                   maximize = FALSE
+)
+xgbTree.model
+
+preds <- predict(xgbTree.model, newdata = movie.test) %>% exp()
+dat <- data.frame(id = movie_test$id, revenue = preds)
+write_csv(dat, "xgbTree-preds.csv")
+```
+
 
 ```{r}
 #eliminating unnecessary variables
