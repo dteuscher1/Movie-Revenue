@@ -3,6 +3,7 @@ title: "Movie Revenue"
 output: pdf_document
 ---
 
+
 Packages used for analysis
 ```{r, message = FALSE}
 library(tidyverse)
@@ -116,7 +117,7 @@ movie_data <- movie_data %>% select(-original_language)
 
 ```
 
-### Function to extract useful data
+## Function to extract useful data
 
 ```{r}
 extract_n_most_freq_to_dummy <- function(vect, pattern, name, n_most_pattern_fun, n_most_freq=NULL) {
@@ -163,7 +164,7 @@ extract_n_most_freq_to_dummy <- function(vect, pattern, name, n_most_pattern_fun
 }
 ```
 
-## Spoken Languages
+### Spoken Languages
 
 ```{r}
 pattern <- "(?<=')[:lower:]{2}(?=')"
@@ -177,179 +178,94 @@ n <- 7
 dummy_sp <- extract_n_most_freq_to_dummy(movie_data$spoken_languages, pattern, name, pattern_fun, n)
 
 movie_data <- cbind(movie_data, dummy_sp)
-```
 
-```{r}
+# Number of spoken languages
 movie_data$Num_Languages <- movie_data %>%
   select(Sp_de:Sp_ru) %>%
   rowSums()
 ```
 
+### Genres
+
 ```{r}
-# Genres
-dv_g <- sapply(movie_data$genres, function(x){unlist(str_extract_all(x, '(?<=\')([A-Z])\\w+(.*?)(?=\')'))}) %>% qdapTools::mtabulate() 
-colnames(dv_g) <- paste0("Genre", gsub(" ", "", colnames(dv_g)))
-rownames(dv_g) <- 1:nrow(dv_g)
-movie_data <- cbind(movie_data, dv_g)
+pattern <- "(?<=\')([A-Z])\\w+(.*?)(?=\')"
+pattern_fun <- function(x) {
+  paste(x, collapse="|")
+}
+name <- 'Genre'
+n <- NULL
+
+dummy_g <- extract_n_most_freq_to_dummy(movie_data$genres, pattern, name, pattern_fun, n)
+
+movie_data <- cbind(movie_data, dummy_g)
 
 # number of genres
 movie_data$num_genres <- movie_data %>% select(GenreAction:GenreWestern) %>% rowSums()
-
-# Attempt 2
-# 
-# pre_genre <- gregexpr(": \'(.*?)}", movie_data$genres)
-# pre_genre2 <- regmatches(movie_data$genres, pre_genre)
-# genres <- lapply(pre_genre2, function(x) substr(x,4,nchar(x) - 2))
-# 
-# movie$genre <- genres
-# dv <- qdapTools::mtabulate(movie$genre); colnames(dv) <- paste0("Genre", gsub(" ", "", colnames(dv)))
-# 
-# movie_data <- cbind(movie_data, dv)
-
-
-# Attempt 1
-# 
-# pre_genre <- gregexpr(": \'(.*?)}", movie_data$genres)
-# pre_genre2 <- regmatches(movie_data$genres, pre_genre)
-# genres <- lapply(pre_genre2, function(x) substr(x,4,nchar(x) - 2))
-#
-# genre_vec <- unlist(genres)
-# genre_names <- names(table(genre_vec))
-# genre.df <- plyr::ldply(genres, rbind)
-# 
-# dv <- matrix(0, ncol = length(genre_names), nrow = nrow(movie_data))
-# for(i in 1:ncol(genre.df)) {
-#   temp <- fastDummies::dummy_cols(genre.df[,i])
-#   temp <- temp[,-1]
-#   colnames(temp) <- substr(colnames(temp), 7, nchar(colnames(temp)))
-#   temp[,setdiff(genre_names, colnames(temp))] <- 0
-#   temp <- temp[,genre_names]
-#   temp[is.na(temp)] <- 0
-#   dv <- dv + temp
-# }
-# colnames(dv) <- gsub(" ", "",colnames(dv))
-# colnames(dv) <- paste0("Genre",colnames(dv))
-# movie_data <- cbind(movie_data, dv)
 ```
 
-
+### Countries
 
 ```{r country}
-# Split apart all of the countries into a separate column
-# >>>>>>> 738ed8b77074956705de1794c9e4fd9b8e512d5c
-separated <- separate(movie_data, production_countries, sep = "\\}, \\{", into = c("Country1", "Country2", "Country3", "Country4", "Country5", "Country6", "Country7", "Country8", "Country9", "Country10", "Country11", "Country12"))
-
-# Function to extract the country name from the json formatted text
-country_name <- function(x) {
-    str_extract(x, pattern = "(?<=name': ')[A-Za-z\\s]+")
+pattern <- "(?<=name': ')[A-Za-z\\s]+"
+pattern_fun <- function(x) {
+  paste(x, collapse="|")
 }
+name <- 'Country'
+n <- 10
 
-# Apply the function to get the country name to all twelve country columns
-countries <- separated %>% select(Country1:Country12) %>% map_df(~country_name(.)) %>% bind_cols(id = separated$id)
+dummy_c <- extract_n_most_freq_to_dummy(movie_data$production_countries, pattern, name, pattern_fun, n)
 
-# Change any countries that have no production company to none
-countries$Country1[is.na(countries$Country1)] <- "None"
-
-# Reshape the data to long format to make country into a factor
-countries_long <- countries %>% pivot_longer(Country1:Country12, names_to = "CountryNumber", values_to = "Country", values_drop_na = TRUE)
-
-# Summarizes the number of movies for each country
-Country_summary <- countries_long %>% 
-  group_by(Country) %>%
-  summarize(count = n()) %>% 
-  arrange(desc(count))
-
-# Changes countries to a factor. Any country that has less than 100 movies produced there is clumped in the other group
-countries_fct <- countries_long %>% 
-  mutate(Country = factor(Country),
-         Country = fct_lump_min(Country, min = 100, other_level = "Other"))
-
-# Make dummy variables for each country remained (and the None and Other groups)
-dummy_many <- countries_fct %>% dummy_cols(select_columns = "Country")
-
-# Combined the multiple observations into a single observation for each row
-# Variables are now ready to be included in the model. 
-country_dummies <- dummy_many %>% group_by(id) %>% mutate(Country_Australia = sum(Country_Australia),
-                                       Country_Canada = sum(Country_Canada),
-                                       Country_France = sum(Country_France),
-                                       Country_Germany = sum(Country_Germany),
-                                       Country_India = sum(Country_India),
-                                       Country_Italy = sum(Country_Italy),
-                                       Country_Japan = sum(Country_Japan),
-                                       Country_Other = sum(Country_Other),
-                                       Country_Russia = sum(Country_Russia),
-                                       Country_Spain = sum(Country_Spain),
-                                       `Country_United Kingdom` = sum(`Country_United Kingdom`),
-                                       `Country_United States of America` = sum(`Country_United States of America`),
-                                       Country_None = sum(Country_None)) %>% 
-                                  distinct(id, .keep_all = TRUE) %>% 
-                                  dplyr::select(-CountryNumber, -Country)
-movie_data <- movie_data %>% bind_cols(country_dummies)
+movie_data <- cbind(movie_data, dummy_c)
 ```
 
-
-
+### Production Companies
 
 ```{r}
-# Clean production company data
+pattern <- "(?<=name': ')[^']+"
 pattern_fun <- function(x) {
   paste(x, collapse="|") %>%
       str_replace_all('([^a-zA-Z0-9 |\\-])', '\\\\\\1')
 }
+name <- 'Comp'
+n <- 30
 
-# Get all companies into a usable list
-company_name <- function(x) {
-    result <- unlist(str_extract_all(x, pattern = "(?<=name': ')[^']+"))
-    result
-}
-companies <- lapply(movie_data$production_companies, company_name) %>%
-  unlist()
+dummy_comp <- extract_n_most_freq_to_dummy(movie_data$production_companies, pattern, name, pattern_fun, n)
 
-# Find most frequently appearing companies
-companies_freq <- tibble(company = companies) %>%
-  group_by(company) %>%
-  count() %>%
-  arrange(desc(n)) %>%
-  ungroup() %>%
-  filter(!is.na(company)) %>%
-  top_n(30, n)
-
-# Create new regular expression for most frequent companies
-company_regex <- paste(companies_freq$company, collapse="|") %>%
-  str_replace_all('([^a-zA-Z0-9 |\\-])', '\\\\\\1')
-
-new_prod_companies <- sapply(movie_data$production_companies, function(x) {
-  unlist(str_extract_all(x, company_regex))
-  })
-
-dummy_companies <- qdapTools::mtabulate(new_prod_companies) 
-colnames(dummy_companies) <- paste0("Comp", gsub("\\W", "", colnames(dummy_companies)))
-
-n_obs <- nrow(dummy_companies)
-rownames(dummy_companies) <- 1:n_obs
-
-movie_data <- cbind(movie_data, dummy_companies)
+movie_data <- cbind(movie_data, dummy_comp)
 ```
+
+## Imputation: Runtime
 
 ```{r}
 # Median imputation for the runtime variable
 movie_data[is.na(movie_data$runtime),]$runtime <- median(movie_data[!is.na(movie_data$runtime),]$runtime)
 ```
 
+## Remove original string variables
 ```{r}
-# Had dto rename these columns to get things to run
-names(movie_data)[1] <- "id"
-names(movie_data)[50] <- "id1"
+# Remove original string vars
+movie_data_1 <- movie_data %>%
+  select(-c(id, genres, production_companies,
+            production_countries, spoken_languages, 
+            title, cast, crew))
+```
 
-movie_data_1 <- movie_data %>% dplyr::select(-id, -genres, -production_companies, -production_countries, -spoken_languages, -title, -cast, -crew, -id1, -crew_count)
+# Predictions
+
+```{r}
 custom_summary <- function(data, lev = NULL, model = NULL) {
-out <- Metrics::rmsle(data[, "obs"], data[, "pred"])
-names(out) <- c("rmsle")
-out
+  out <- Metrics::rmsle(data[, "obs"], data[, "pred"])
+  names(out) <- c("rmsle")
+  return(out)
 }
 
-movie.train <- movie_data_1[!is.na(movie_data_1$revenue),] %>% dplyr::select(-revenue)
-movie.test <- movie_data_1[is.na(movie_data_1$revenue),] %>% dplyr::select(-revenue)
+movie.train <- movie_data_1 %>%
+  filter(!is.na(revenue)) %>% 
+  select(-revenue)
+movie.test <- movie_data_1 %>%
+  filter(is.na(revenue)) %>% 
+  select(-revenue)
+
 myControl <- trainControl(method = "cv",
                           number = 10,
                           summaryFunction = custom_summary)
@@ -358,8 +274,10 @@ test <- preProcess(movie.test, method = c("nzv", "zv", "pca"))
 movie.train <- predict(train, movie.train)
 movie.test <- predict(test, movie.test)
 
-movie.train <- movie.train %>% mutate(revenue = movie_data_1$revenue[!is.na(movie_data_1$revenue)])
-movie.test <- movie.test %>% mutate(revenue = movie_data_1$revenue[is.na(movie_data_1$revenue)])
+movie.train <- movie.train %>% 
+  mutate(revenue = movie_data_1$revenue[!is.na(movie_data_1$revenue)])
+movie.test <- movie.test %>% 
+  mutate(revenue = movie_data_1$revenue[is.na(movie_data_1$revenue)])
 ```
 
 ```{r}
