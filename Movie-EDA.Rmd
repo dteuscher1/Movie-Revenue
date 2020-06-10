@@ -1,6 +1,6 @@
 ---
 title: "Movie Revenue"
-output: pdf_document
+output: html_document
 ---
 
 
@@ -106,7 +106,12 @@ movie_data <- movie_data %>%
 ```{r}
 movie_data$cast_count <- str_count(movie_data$cast, "'name':\\s'")
 movie_data$crew_count <- str_count(movie_data$crew, "'name':\\s'")
+
+# Impute median for missing crew_count values
+movie_data[is.na(movie_data$crew_count),]$crew_count <- median(movie_data$crew_count, na.rm=TRUE)
 ```
+
+## Original Language
 
 ```{r}
 # Most of the movies are English, so I'm going to add another indicator variable to specify if the original language was English or not
@@ -243,72 +248,78 @@ movie_data[is.na(movie_data$runtime),]$runtime <- median(movie_data[!is.na(movie
 
 ## Remove original string variables
 ```{r}
-# Remove original string vars
 movie_data_1 <- movie_data %>%
   select(-c(id, genres, production_companies,
             production_countries, spoken_languages, 
             title, cast, crew))
 ```
 
-# Predictions
+# Preprocessing
 
 ```{r}
+# Split dataset into original train/test split
+movie.train.pre <- movie_data_1 %>%
+  filter(!is.na(revenue)) %>%
+  select(-revenue)
+movie.test.pre <- movie_data_1 %>%
+  filter(is.na(revenue)) %>% 
+  select(-revenue)
+```
+
+## PCA Dataset
+
+```{r}
+# Remove variables with near-zero variance and reduce dimensionality
+train <- preProcess(movie.train.pre, method = c("nzv", "pca"))
+movie.train <- predict(train, movie.train.pre)
+movie.test <- predict(train, movie.test.pre)
+
+movie.train <- movie.train %>% 
+  mutate(revenue = movie_data_1$revenue[!is.na(movie_data_1$revenue)])
+```
+
+## No PCA Dataset
+
+```{r}
+# Remove variables with near-zero variance and reduce dimensionality
+train <- preProcess(movie.train.pre, method = c("nzv", "center", "scale"))
+movie.train.nopca <- predict(train, movie.train.pre)
+movie.test.nopca <- predict(train, movie.test.pre)
+
+movie.train.nopca <- movie.train.nopca %>% 
+  mutate(revenue = movie_data_1$revenue[!is.na(movie_data_1$revenue)])
+```
+
+# Predictions
+
+## Prepping for caret library
+
+```{r}
+# Using rmsle as scoring function for cross validation fitting
 custom_summary <- function(data, lev = NULL, model = NULL) {
   out <- Metrics::rmsle(data[, "obs"], data[, "pred"])
   names(out) <- c("rmsle")
   return(out)
 }
 
-movie.train <- movie_data_1 %>%
-  filter(!is.na(revenue)) %>% 
-  select(-revenue)
-movie.test <- movie_data_1 %>%
-  filter(is.na(revenue)) %>% 
-  select(-revenue)
-
 myControl <- trainControl(method = "cv",
                           number = 10,
                           summaryFunction = custom_summary)
-train <- preProcess(movie.train, method = c("nzv", "zv", "pca"))
-test <- preProcess(movie.test, method = c("nzv", "zv", "pca"))
-movie.train <- predict(train, movie.train)
-movie.test <- predict(test, movie.test)
 
-movie.train <- movie.train %>% 
-  mutate(revenue = movie_data_1$revenue[!is.na(movie_data_1$revenue)])
-movie.test <- movie.test %>% 
-  mutate(revenue = movie_data_1$revenue[is.na(movie_data_1$revenue)])
+# Set random seed
+set.seed(1989)
 ```
 
-```{r}
-tunegrid <- expand.grid(nrounds = c(40, 50, 60),
-                        lambda = c(0, .01, .025),
-                        alpha = c(0, .01, .025),
-                        eta = c(.2, .3, .4))
-
-xgbLinear.model <- train(log(revenue)~.,
-                   data = movie.train,
-                   method = "xgbLinear",
-                   tuneGrid = tunegrid,
-                   trControl = myControl,
-                   metric = "rmsle",
-                   maximize = FALSE
-                  #preProcess = c("nzv", "zv", "center", "scale")
-)
-xgbLinear.model
-```
+## Log Random Forest
 
 ```{r}
-# Random forest
 model <- train(log(revenue)~.,
                   data = movie.train,
                   method = "ranger",
                   tuneLength = 5,
                   trControl = myControl,
                   metric = "rmsle",
-                  maximize = FALSE,
-                  preProcess = c("nzv", "zv", "center", "scale")
-)
+                  maximize = FALSE); beepr::beep(3)
 model
 
 preds <- predict(model, newdata = movie.test) %>% exp()
@@ -316,16 +327,16 @@ dat <- data.frame(id = movie_test$id, revenue = preds)
 write_csv(dat, "log-rf-preds.csv")
 ```
 
+## Glmnet
+
 ```{r}
-# Glmnet
 model2 <- train(log(revenue)~.,
                 data = movie.train,
                 method = "glmnet",
                 tuneLength = 10,
                 trControl = myControl,
                 metric ="rmsle",
-                maximize = FALSE,
-                preProcess = c("nzv", "zv", "center", "scale"))
+                maximize = FALSE); beepr::beep(3)
 model2
 
 preds <- predict(model2, newdata = movie.test) %>% exp()
@@ -333,16 +344,16 @@ dat <- data.frame(id = movie_test$id, revenue = preds)
 write_csv(dat, "glmnet-preds.csv")
 ```
 
+## Bagged MARS
+
 ```{r}
-# Bagged MARS
 model3 <- train(log(revenue)~.,
                 data = movie.train,
                 method = "bagEarth",
                 tuneLength = 5,
                 trControl = myControl,
                 metric ="rmsle",
-                maximize = FALSE,
-                preProcess = c("nzv", "zv", "center", "scale"))
+                maximize = FALSE); beepr::beep(3)
 model3
 
 preds <- predict(model3, newdata = movie.test) %>% exp()
@@ -350,16 +361,16 @@ dat <- data.frame(id = movie_test$id, revenue = preds)
 write_csv(dat, "mars-preds.csv")
 ```
 
+## SVM
+
 ```{r}
-# SVM
 model4 <- train(log(revenue)~.,
                 data = movie.train,
                 method = "svmRadial",
                 tuneLength = 5,
                 trControl = myControl,
                 metric ="rmsle",
-                maximize = FALSE,
-                preProcess = c("nzv", "zv", "center", "scale"))
+                maximize = FALSE); beepr::beep(3)
 model4
 
 preds <- predict(model4, newdata = movie.test) %>% exp()
@@ -367,94 +378,52 @@ dat <- data.frame(id = movie_test$id, revenue = preds)
 write_csv(dat, "svm-preds.csv")
 ```
 
-```{r}
-# tuning ranger (2.15475 score)
-movie_data_1 <- movie_data %>% dplyr::select(-id, -genres, -production_companies, -production_countries, -spoken_languages, -title, -cast, -crew, -id1, -crew_count)
-custom_summary <- function(data, lev = NULL, model = NULL) {
-  out <- Metrics::rmsle(data[, "obs"], data[, "pred"])
-  names(out) <- c("rmsle")
-  out
-}
+## Random Forest, No PCA (2.15475 score)
 
-movie.train <- movie_data_1[!is.na(movie_data_1$revenue),] %>% dplyr::select(-revenue)
-movie.test <- movie_data_1[is.na(movie_data_1$revenue),] %>% dplyr::select(-revenue)
+```{r}
+
 grid <- expand.grid("mtry" = c(20, 25, 30), "splitrule" = "extratrees", min.node.size = c(1, 3, 5))
-movie.train <- movie.train %>% mutate(revenue = movie_data_1$revenue[!is.na(movie_data_1$revenue)])
-movie.test <- movie.test %>% mutate(revenue = movie_data_1$revenue[is.na(movie_data_1$revenue)])
 
 model.rf2 <- train(log(revenue)~.,
-                  data = movie.train,
+                  data = movie.train.nopca,
                   method = "ranger",
                   tuneGrid = grid,
                   trControl = myControl,
                   metric = "rmsle",
-                  maximize = FALSE,
-                  preProcess = c("nzv", "zv", "center", "scale")
-)
+                  maximize = FALSE); beepr::beep(3)
 
 model.rf2
 
-preds.rf2 <- predict(model.rf2, newdata = movie.test) %>% exp()
+preds.rf2 <- predict(model.rf2, newdata = movie.test.nopca) %>% exp()
 rf.dat2 <- data.frame(id = movie_test[,1], revenue = preds.rf2)
 write_csv(rf.dat2, path = "rf_nopca2.csv")
 
 ```
 
+## Gradient Boosting Forest, No PCA (2.07568 score)
 
 ```{r}
-# Gradient Boosting Forest (2.07568 score)
-
-movie_data_1 <- movie_data %>% dplyr::select(-id, -genres, -production_companies, -production_countries, -spoken_languages, -title, -cast, -crew, -id1, -crew_count)
-custom_summary <- function(data, lev = NULL, model = NULL) {
-out <- Metrics::rmsle(data[, "obs"], data[, "pred"])
-names(out) <- c("rmsle")
-out
-}
-
-movie.train <- movie_data_1[!is.na(movie_data_1$revenue),] %>% dplyr::select(-revenue)
-movie.test <- movie_data_1[is.na(movie_data_1$revenue),] %>% dplyr::select(-revenue)
-myControl <- trainControl(method = "cv",
-                          number = 3,
-                          summaryFunction = custom_summary)
-
-movie.train <- movie.train %>% mutate(revenue = movie_data_1$revenue[!is.na(movie_data_1$revenue)])
-movie.test <- movie.test %>% mutate(revenue = movie_data_1$revenue[is.na(movie_data_1$revenue)])
-
 grid <- expand.grid("n.trees"=500, "interaction.depth"=4, "shrinkage"=0.1, "n.minobsinnode"=20)
 
 rfb.mod <- train(log(revenue)~.,
-                 data=movie.train,
+                 data=movie.train.nopca,
                  method="gbm",
                  tuneGrid=grid,
                  trControl=myControl,
                  metric = "rmsle",
-                 verbose=F,
-                 preProcess = c("nzv", "zv", "center", "scale")
-                 )
+                 verbose=F); beepr::beep(3)
 
-preds <- predict(rfb.mod, newdata = movie.test) %>% exp()
+preds <- predict(rfb.mod, newdata = movie.test.nopca) %>% exp()
 dat <- data.frame(id = movie_test$id, revenue = preds)
 write_csv(dat, "rf-gboost-preds.csv")
 ```
 
+## xgbLinear, No PCA (2.1869 score)
+
 ```{r}
-# xgbLinear (2.1869 score)
-
-movie_data_1 <- movie_data %>% dplyr::select(-id, -genres, -production_companies, -production_countries, -spoken_languages, -title, -cast, -crew, -id1, -crew_count)
-custom_summary <- function(data, lev = NULL, model = NULL) {
-out <- Metrics::rmsle(data[, "obs"], data[, "pred"])
-names(out) <- c("rmsle")
-out
-}
-
-movie.train <- movie_data_1[!is.na(movie_data_1$revenue),] %>% dplyr::select(-revenue)
-movie.test <- movie_data_1[is.na(movie_data_1$revenue),] %>% dplyr::select(-revenue)
 myControl <- trainControl(method = "cv",
                           number = 3,
                           summaryFunction = custom_summary)
-
-movie.train <- movie.train %>% mutate(revenue = movie_data_1$revenue[!is.na(movie_data_1$revenue)])
-movie.test <- movie.test %>% mutate(revenue = movie_data_1$revenue[is.na(movie_data_1$revenue)])
 
 tunegrid <- expand.grid(nrounds = 60,
                         lambda = .01,
@@ -462,23 +431,22 @@ tunegrid <- expand.grid(nrounds = 60,
                         eta = .2)
 
 xgbLinear.model <- train(log(revenue)~.,
-                   data = movie.train,
+                   data = movie.train.nopca,
                    method = "xgbLinear",
                    tuneGrid = tunegrid,
                    trControl = myControl,
                    metric = "rmsle",
-                   maximize = FALSE
-                  #preProcess = c("nzv", "zv", "center", "scale")
-)
+                   maximize = FALSE); beepr::beep(3)
 xgbLinear.model
 
-preds <- predict(xgbLinear.model, newdata = movie.test) %>% exp()
+preds <- predict(xgbLinear.model, newdata = movie.test.nopca) %>% exp()
 dat <- data.frame(id = movie_test$id, revenue = preds)
 write_csv(dat, "xgbLinear-preds.csv")
 ```
 
+## XGB Tree (2.09998 score)
+
 ```{r}
-# xgbTree (2.09998 score) 
 tunegrid <- expand.grid(eta = .25,
                         max_depth = 3,
                         colsample_bytree = .9,
@@ -501,17 +469,3 @@ preds <- predict(xgbTree.model, newdata = movie.test) %>% exp()
 dat <- data.frame(id = movie_test$id, revenue = preds)
 write_csv(dat, "xgbTree-preds.csv")
 ```
-
-
-```{r}
-#eliminating unnecessary variables
-colnames(movie_data)
-
-#c("ï..id", "belongs_to_collection", "genres", "homepage", "imdb_id", "original_language", "original_title", "overview", "poster_path", "production_companies", "production_countries", "spoken_languages", "status", "tagline", "title", "Keywords", "cast", "crew")
-
-#ideas
-#sentiment on title
-#cast and crew- make count Shane
-#number of genres - McKay
-```
-
