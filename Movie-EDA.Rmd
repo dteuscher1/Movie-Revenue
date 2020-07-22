@@ -1,6 +1,11 @@
 ---
 title: "Movie Revenue"
-output: html_document
+output: 
+  html_document:
+    toc: TRUE
+    theme: cerulean
+    number_sections: TRUE
+    code_folding: show
 ---
 
 
@@ -31,7 +36,7 @@ colnames(movie_test)[1] <- "id"
 
 ## Initial Plots
 
-```{r}
+```{r, message=FALSE}
 # Plots of numeric variables
 ggplot(movie_data, aes(x = popularity, y = revenue)) + geom_point() + geom_smooth(method = "loess", se = FALSE) + xlim(0, 300)
 ggplot(movie_data, aes(x = runtime, y = revenue)) + geom_point() + geom_smooth(method = "loess", se = FALSE)
