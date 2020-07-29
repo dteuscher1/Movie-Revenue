@@ -20,6 +20,7 @@ library(purrr)
 library(lubridate)
 library(scales)
 library(patchwork)
+library(ggthemes)
 ```
 
 # Exploratory Data Analysis
@@ -73,11 +74,31 @@ p3 <- ggplot(movie_data, aes(x = budget, y = revenue)) +
 (p1 + p2)/p3
 ```
 
-With most of the categorical variables, there is data manipulation and cleaning that needs to be done to extract the useful information. Most of the important variables are in JSON format and the relevant information will be extracted using regular expressions mostly. 
 
 # Data Cleaning
 
+
+## Response Variable 
+
+When dealing with revenue, something that is in the millions of dollars, there are likely to be outliers and the distribution of revenue is likely to be skewed. From the plot below, the distribution of revenue is highly right skewed. When fitting a model, it will likely be better to use the log of revenue. The distribution of the log of revenue is less skewed and it can help so the outliers don't influence the model when training the model. 
+
+```{r, warning=FALSE, message=FALSE}
+p1a <- ggplot(movie_data, aes(x = revenue)) +
+  geom_histogram(fill = "coral3", bins = 35) +
+  scale_x_continuous(labels = comma) +
+  labs(x = "Revenue", y = "Frequency") + 
+  theme_classic()
+p1b <- ggplot(movie_data %>% filter(!is.na(revenue)), aes(x = log(revenue))) +
+  geom_histogram(fill = "coral3", bins = 35) +
+  scale_x_continuous(labels = comma) +
+  labs(x = "Log(Revenue)", y = "Frequency") + 
+  theme_classic()
+p1a + p1b
+```
+
 ## Initial Variable Dropping
+
+With most of the categorical variables, there is data manipulation and cleaning that needs to be done to extract the useful information. Most of the important variables are in JSON format and the relevant information will be extracted using regular expressions mostly. 
 
 There are some variables, `imdb_id`, `original_title`, `overview`, `poster_path`, and `status` that don't provide a lot of information about the revenue a movie brings in. As a result, those variables are dropped from the dataset. There is also one movie that did not have a release date listed, so I looked up the release data for the movie. After adding that release date, the release date was changed from a character to a date variable. 
 
@@ -94,7 +115,7 @@ movie_data$release_date <- parse_date_time2(movie_data$release_date, orders = "%
 
 Next, I want to look at the variables that have a high percentage of missing values. The variables `belongs_to_collection` and `homepage` are missing more than 50% of the time. `Keywords` and `tagline` are the other variables that have quite a few missing values. The revenue variable is not of concern to me here since the missing values for revenue come from the test set. Since there are so many missing values for these variables, I created dummy variables to indicate whether or not an observation had keywords, a tagline, a homepage, or belonged to a collection. The boxplots below show movies that have keywords, a tagline, a homepage, or belong to collection have a higher revenue on average. Even though the difference is small for `homepage`, I will drop the actual variables and use the dummy variables for all four of the variables. Also, the log of revenue is used to better show the difference between the group and to limit the influence outliers have on the plots. 
 
-```{r}
+```{r, warning = FALSE, message = FALSE}
 # Analyzing features with many NAs
 
 movie_nas <- movie_train %>%
@@ -102,32 +123,36 @@ movie_nas <- movie_train %>%
   mutate_at(.funs = list(cat = ~ifelse(is.na(.), 0, 1)), 
             .vars = c("Keywords", "tagline", "homepage",
                       "belongs_to_collection"))
-head(movie_nas)
 
-ggplot(movie_nas, aes(x = factor(belongs_to_collection_cat), y = log(revenue))) + 
+p4 <- ggplot(movie_nas, aes(x = factor(belongs_to_collection_cat), y = log(revenue))) + 
   geom_jitter(alpha = .2, color = 'steelblue') +
   geom_boxplot(alpha = .1) +
   scale_x_discrete(labels = c("No", "Yes")) +
-  labs(x = 'Belongs to a Collection', y = 'Log(Revenue)')
+  labs(x = 'Belongs to a Collection', y = 'Log(Revenue)') +
+  theme_classic()
 
-ggplot(movie_nas, aes(x = factor(Keywords_cat), y = log(revenue))) + 
+p5 <- ggplot(movie_nas, aes(x = factor(Keywords_cat), y = log(revenue))) + 
   geom_jitter(alpha = .2, color = 'steelblue') +
   geom_boxplot(alpha = .1) +
   scale_x_discrete(labels = c("No", "Yes")) +
-  labs(x = 'Keywords', y = 'Log(Revenue)')
+  labs(x = 'Keywords', y = 'Log(Revenue)') +
+  theme_classic()
 
-ggplot(movie_nas, aes(x = factor(homepage_cat), y = log(revenue))) + 
+p6 <- ggplot(movie_nas, aes(x = factor(homepage_cat), y = log(revenue))) + 
   geom_jitter(alpha = .2, color = 'steelblue') +
   geom_boxplot(alpha = .1) +
   scale_x_discrete(labels = c("No", "Yes")) +
-  labs(x = 'Homepage', y = 'Log(Revenue)')
+  labs(x = 'Homepage', y = 'Log(Revenue)') +
+  theme_classic()
 
-ggplot(movie_nas, aes(x = factor(tagline_cat), y = log(revenue))) + 
+p7 <- ggplot(movie_nas, aes(x = factor(tagline_cat), y = log(revenue))) + 
   geom_jitter(alpha = .2, color = 'steelblue') +
   geom_boxplot(alpha = .1) +
   scale_x_discrete(labels = c("No", "Yes")) +
-  labs(x = 'Homepage', y = 'Log(Revenue)')
+  labs(x = 'Homepage', y = 'Log(Revenue)') +
+  theme_classic()
 
+p4 + p5 + p6 + p7
 # Add indicator columns to main data
 movie_data <- movie_data %>% 
   mutate_at(.funs = list(ind = ~ifelse(is.na(.), 0, 1)),
@@ -145,7 +170,7 @@ There were a number of ideas of how to work with the cast and crew. There is a p
 
 
 
-```{r}
+```{r, warning= FALSE, message = FALSE}
 movie_data$cast_count <- str_count(movie_data$cast, "'name':\\s'")
 movie_data$crew_count <- str_count(movie_data$crew, "'name':\\s'")
 
@@ -158,7 +183,7 @@ p8 <- ggplot(movie_data, aes(x = cast_count)) +
 
 p9 <- ggplot(movie_data, aes(x = crew_count)) +
   geom_density(fill = "coral3") +
-  labs(x = "Number of Crew Members", y = "Density")
+  labs(x = "Number of Crew Members", y = "Density") 
 
 
 p10 <- ggplot(movie_data, aes(x = cast_count, y = revenue)) +
@@ -176,9 +201,18 @@ p11 <- ggplot(movie_data, aes(x = crew_count, y = revenue)) +
 
 ## Original Language
 
-```{r}
+Most of the movies have an original language of English, so I created an indicator variable that specifies whether the original language was English. The plot below shows that the log revenue is greater for movies where the original language was English. As a result, I will leave the indicator variable in the dataset and drop the original language variable. 
+
+```{r, warning = FALSE, message = FALSE}
 # Most of the movies are English, so I'm going to add another indicator variable to specify if the original language was English or not
 movie_data <- movie_data %>% mutate(English = ifelse(original_language == "en", 1, 0))
+
+ggplot(movie_data, aes(x = factor(English), y = log(revenue))) + 
+  geom_jitter(alpha = .2, color = 'steelblue') +
+  geom_boxplot(alpha = .1) +
+  scale_x_discrete(labels = c("No", "Yes")) +
+  labs(x = 'Original Language: English', y = 'Log(Revenue)') +
+  theme_classic()
 
 # Drop original langauge column
 movie_data <- movie_data %>% select(-original_language)
@@ -186,6 +220,8 @@ movie_data <- movie_data %>% select(-original_language)
 ```
 
 ## Function to extract useful data
+
+This is a function that was written to used to extract information about the spoken languages, genres, production countries, and production companies and create dummy variables to be used for the model. 
 
 ```{r}
 extract_n_most_freq_to_dummy <- function(vect, pattern, name, n_most_pattern_fun, n_most_freq=NULL) {
@@ -208,7 +244,7 @@ extract_n_most_freq_to_dummy <- function(vect, pattern, name, n_most_pattern_fun
       ungroup() %>%
       filter(!is.na(var)) %>%
       top_n(n_most_freq, n)
-    
+
     # Create new regular expression for most frequently occuring vars
     var_regex <- n_most_pattern_fun(var_freq$var)
     # var_regex <- paste(var_freq$var, collapse="|") %>%
@@ -232,7 +268,36 @@ extract_n_most_freq_to_dummy <- function(vect, pattern, name, n_most_pattern_fun
 }
 ```
 
+
+```{r}
+extract_n_most_freq <- function(vect, pattern, name, n_most_pattern_fun, n_level) {
+  
+  # Get all vars into a usable list
+  var_extractor <- function(x) {
+      unlist(str_extract_all(x, pattern=pattern))
+  }
+  
+  if(!is.null(n_level)) {
+    n_level <- n_level
+    extracted_vars <- lapply(vect, var_extractor) %>%
+      unlist()
+    
+    # Find n most frequently appearing vars
+    var_freq <- tibble(var = extracted_vars) %>%
+      mutate(var = fct_lump(var, n = n_level)) %>%
+      group_by(var) %>%
+      count() %>%
+      arrange(desc(n)) %>%
+      ungroup() %>%
+      filter(!is.na(var))
+  }
+  return(var_freq)
+}
+```
+
 ### Spoken Languages
+
+There are 98 different spoken languages for all of the different movies. I decided to take the top 10 languages and create indicator variables for them and all of the other languages will be grouped together. From the bargraph below, most of the movies have English as a spoken language. The other group is next, which in part is because there are 88 language combined together in that category. Even then, the other gorup isn't close the number of movies with English as a spoken language. Most movies have one spoken language usually, but ocassionally they have more. 
 
 ```{r}
 pattern <- "(?<=')[:lower:]{2}(?=')"
@@ -241,21 +306,44 @@ pattern_fun <- function(x) {
     paste0("(?<=')(", ., ")")
 }
 name <- 'Sp_'
-n <- 7
+n <- 10
 
 dummy_sp <- extract_n_most_freq_to_dummy(movie_data$spoken_languages, pattern, name, pattern_fun, n)
+freq_sp <- extract_n_most_freq(movie_data$spoken_languages, pattern, name, pattern_fun, n)
+freq_sp <- freq_sp %>% mutate(var = c("English", "Other", "French", "Spanish", "German", "Russian", "Italian", "Japanese", "Mandarin Chinese", "Hindi", "Arabic"))
+
+p12 <- freq_sp %>% 
+  mutate(var = fct_reorder(var, n)) %>%
+  ggplot(aes(x = factor(var), y = n, fill = var)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Language", y = "Count") +
+  coord_flip() + 
+  scale_fill_viridis_d() +
+  theme_classic() +
+  theme(legend.position = "none")
+
+p12 
 
 movie_data <- cbind(movie_data, dummy_sp)
-
 # Number of spoken languages
 movie_data$Num_Languages <- movie_data %>%
-  select(Sp_de:Sp_ru) %>%
+  select(Sp_ar:Sp_zh) %>%
   rowSums()
+
+ggplot(movie_data, aes(x = Num_Languages)) +
+  geom_histogram(fill = "coral3", boundary  = 0, binwidth = 1) +
+  labs(x = "Number of Languages", y = "Count") + 
+  theme_clean()
+
 ```
 
 ### Genres
 
-```{r}
+There are a total of 19 different genres that are listed and some movies have more than one genre listed. It appears that as the number of genres increases, the revenue for a movie increases. Most films have at least 2 genres as well. If a movie can be classified under multiple genres, then the movie is more likely to attrach people with different interests in movies. The most common genres are drama, comedy, thriller, and action movies. Those movies don't necessarily have the highest median revenue, which makes sense. If there are more drama movies, there are likely to be really good drama movies that bring in a lot of revenue, but there are likely movies that do poorly as well. 
+
+One note about the median revenue plot: I assumed that the genre that was listed first was considered the main genre for the movie. I'm not sure if that assumption is correct, but that is the assumption that was made when creatign that plot. The same assumption will apply to the median revenue graphs for production companies and production countries. 
+
+```{r, warning=FALSE, message=FALSE}
 pattern <- "(?<=\')([A-Z])\\w+(.*?)(?=\')"
 pattern_fun <- function(x) {
   paste(x, collapse="|")
@@ -264,14 +352,50 @@ name <- 'Genre'
 n <- NULL
 
 dummy_g <- extract_n_most_freq_to_dummy(movie_data$genres, pattern, name, pattern_fun, n)
-
+freq_g <- extract_n_most_freq(movie_data$genres, pattern, name, pattern_fun, 19)
+p13 <- freq_g %>% 
+  mutate(var = fct_reorder(var, n)) %>%
+  ggplot(aes(x = factor(var), y = n, fill = var)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Genre", y = "Count") +
+  coord_flip() + 
+  scale_fill_viridis_d() +
+  theme_classic() +
+  theme(legend.position = "none")
 movie_data <- cbind(movie_data, dummy_g)
 
+p14 <- movie_data %>% 
+  filter(!is.na(genres)) %>%
+  mutate(genre_first = str_extract(genres, "(?<=\')([A-Z])\\w+(.*?)(?=\')")) %>%
+  group_by(genre_first) %>%
+  summarize(medrev = median(revenue, na.rm = TRUE)) %>%
+  mutate(genre_first = fct_reorder(genre_first, medrev)) %>%
+  ggplot(aes(x = factor(genre_first), y = medrev, fill = genre_first)) +
+  geom_bar(stat = "identity") + 
+  scale_fill_viridis_d() +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  labs(x = "Median Revenue", y = "Main Genre")
+p13 + p14
 # number of genres
 movie_data$num_genres <- movie_data %>% select(GenreAction:GenreWestern) %>% rowSums()
+
+p15 <- ggplot(movie_data, aes(x = num_genres)) +
+  geom_histogram(fill = "coral3", boundary  = 0, binwidth = 1) +
+  labs(x = "Number of Genres", y = "Count") + 
+  theme_classic()
+p16 <- ggplot(movie_data, aes(x =factor(num_genres), y = log(revenue))) +
+  geom_jitter(alpha = .2, color = 'steelblue') +
+  geom_boxplot(alpha = .1) +
+  labs(x = 'Number of Genres', y = 'Log(Revenue)') +
+  theme_classic()
+p15 / p16
 ```
 
 ### Countries
+
+There are 97 different countries where movies were produced. TThe most movies were produced in the United States, which isn't very surprising. The previous assumption that was mentioned with genres is assumed here as well. The United States has a relatively high median revenue, but Germany has an extremely high. The other countries have a relatively low median revenue, even though there are a lot of movies produced in the 87 other countries that are not listed. 
 
 ```{r country}
 pattern <- "(?<=name': ')[A-Za-z\\s]+"
@@ -282,11 +406,42 @@ name <- 'Country'
 n <- 10
 
 dummy_c <- extract_n_most_freq_to_dummy(movie_data$production_countries, pattern, name, pattern_fun, n)
+freq_c <- extract_n_most_freq(movie_data$production_countries, pattern, name, pattern_fun, n)
+p17 <- freq_c %>% 
+  mutate(var = fct_reorder(var, n)) %>%
+  ggplot(aes(x = factor(var), y = n, fill = var)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Country", y = "Count") +
+  coord_flip() + 
+  scale_fill_viridis_d() +
+  theme_classic() +
+  theme(legend.position = "none")
+
+p18 <- movie_data %>% 
+  filter(!is.na(production_countries)) %>%
+  mutate(country_first = str_extract(production_countries, "(?<=name': ')[A-Za-z\\s]+"),
+         country_first = fct_lump(country_first, 10)) %>%
+  group_by(country_first) %>%
+  summarize(medrev = median(revenue, na.rm = TRUE)) %>%
+  filter(country_first %in% freq_c$var) %>%
+  mutate(country_first = fct_reorder(country_first, medrev)) %>%
+  ggplot(aes(x = factor(country_first), y = medrev, fill = country_first)) +
+  geom_bar(stat = "identity") + 
+  scale_fill_viridis_d() +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  labs(x = "Median Revenue", y = "First Country") +
+  scale_y_continuous(labels = comma)
+p17 / p18
 
 movie_data <- cbind(movie_data, dummy_c)
+
 ```
 
 ### Production Companies
+
+There are a lot of production companies and as a result, the other category is extremely large. On the plot that shows the number of films made by each production company, the other category was filtered out because it was so much larger than the other ones. Disney easily has the highest median revenue even though they produce fewer films than most of the other top ten production companies. Warner Brothers produces a lot of movies, but has a lower median revenue. 
 
 ```{r}
 pattern <- "(?<=name': ')[^']+"
@@ -295,14 +450,46 @@ pattern_fun <- function(x) {
       str_replace_all('([^a-zA-Z0-9 |\\-])', '\\\\\\1')
 }
 name <- 'Comp'
-n <- 30
+n <- 10
 
 dummy_comp <- extract_n_most_freq_to_dummy(movie_data$production_companies, pattern, name, pattern_fun, n)
+freq_pc <- extract_n_most_freq(movie_data$production_companies, pattern, name, pattern_fun, n)
 
+p19 <- freq_pc %>% 
+  filter(var != "Other") %>%
+  mutate(var = fct_reorder(var, n)) %>%
+  ggplot(aes(x = factor(var), y = n, fill = var)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Production Company", y = "Count") +
+  coord_flip() + 
+  scale_fill_viridis_d() +
+  theme_classic() +
+  theme(legend.position = "none")
+
+
+p20 <- movie_data %>% 
+  filter(!is.na(production_companies)) %>%
+  mutate(company_first = str_extract(production_companies, "(?<=name': ')[^']+"),
+         company_first = fct_lump(company_first, 10)) %>%
+  group_by(company_first) %>%
+  summarize(medrev = median(revenue, na.rm = TRUE)) %>%
+  filter(company_first %in% freq_pc$var) %>%
+  mutate(company_first = fct_reorder(company_first, medrev)) %>%
+  ggplot(aes(x = factor(company_first), y = medrev, fill = company_first)) +
+  geom_bar(stat = "identity") + 
+  scale_fill_viridis_d() +
+  coord_flip() +
+  theme_classic() +
+  theme(legend.position = "none") +
+  labs(x = "Median Revenue", y = "Main Production Company") +
+  scale_y_continuous(labels = comma)
+p19 /p20
 movie_data <- cbind(movie_data, dummy_comp)
 ```
 
 ## Imputation: Runtime
+
+There were a few movies where the runtime of the movie as missing, so I imputed the median for the runtime for those movies. 
 
 ```{r}
 # Median imputation for the runtime variable
@@ -310,6 +497,8 @@ movie_data[is.na(movie_data$runtime),]$runtime <- median(movie_data[!is.na(movie
 ```
 
 ## Remove original string variables
+
+The variables that I used to create the dummy variables are removed from the dataset. 
 ```{r}
 movie_data_1 <- movie_data %>%
   select(-c(id, genres, production_companies,
@@ -317,7 +506,10 @@ movie_data_1 <- movie_data %>%
             title, cast, crew))
 ```
 
-# Preprocessing
+# Model Fitting
+## Preprocessing
+
+At this point, I have extracted enough variables that I am prepared to fit some models and see how they perform. There is some preprocessing I wanted to do before I fit the model. Specifically, I split the dataset back into the training and test sets and then I removed near-zero variance variables, and centered and scaled variables. From previous attempts, the performance of the models improved when doing this. 
 
 ```{r}
 # Split dataset into original train/test split
@@ -327,13 +519,9 @@ movie.train.pre <- movie_data_1 %>%
 movie.test.pre <- movie_data_1 %>%
   filter(is.na(revenue)) %>% 
   select(-revenue)
-```
 
-## PCA Dataset
-
-```{r}
 # Remove variables with near-zero variance and reduce dimensionality
-train <- preProcess(movie.train.pre, method = c("nzv", "pca"))
+train <- preProcess(movie.train.pre, method = c("nzv", "center", "scale"))
 movie.train <- predict(train, movie.train.pre)
 movie.test <- predict(train, movie.test.pre)
 
@@ -341,22 +529,10 @@ movie.train <- movie.train %>%
   mutate(revenue = movie_data_1$revenue[!is.na(movie_data_1$revenue)])
 ```
 
-## No PCA Dataset
 
-```{r}
-# Remove variables with near-zero variance and reduce dimensionality
-train <- preProcess(movie.train.pre, method = c("nzv", "center", "scale"))
-movie.train.nopca <- predict(train, movie.train.pre)
-movie.test.nopca <- predict(train, movie.test.pre)
+## Summary function and trainControl
 
-movie.train.nopca <- movie.train.nopca %>% 
-  mutate(revenue = movie_data_1$revenue[!is.na(movie_data_1$revenue)])
-```
-
-# Predictions
-
-## Prepping for caret library
-
+I am learning to use the `caret` package in R and all of the models will be fit using the caret package. This competition is measuring RMSLE, which `caret` doesn't calculate, so this custom summary function was written in order to calculate the RMSLE. Below there are four different models that are fit, which I will include as examples of the different models. The code for them are all very similar with the only difference being the specified method (model) and the tuning parameters that are used to create the grid. If you have questions about this, I suggest looking at the manual for `caret` (http://topepo.github.io/caret/). 
 ```{r}
 # Using rmsle as scoring function for cross validation fitting
 custom_summary <- function(data, lev = NULL, model = NULL) {
@@ -366,89 +542,20 @@ custom_summary <- function(data, lev = NULL, model = NULL) {
 }
 
 myControl <- trainControl(method = "cv",
-                          number = 10,
+                          number = 3,
                           summaryFunction = custom_summary)
 
-# Set random seed
-set.seed(1989)
 ```
 
-## Log Random Forest
-
-```{r}
-model <- train(log(revenue)~.,
-                  data = movie.train,
-                  method = "ranger",
-                  tuneLength = 5,
-                  trControl = myControl,
-                  metric = "rmsle",
-                  maximize = FALSE); beepr::beep(3)
-model
-
-preds <- predict(model, newdata = movie.test) %>% exp()
-dat <- data.frame(id = movie_test$id, revenue = preds)
-write_csv(dat, "log-rf-preds.csv")
-```
-
-## Glmnet
-
-```{r}
-model2 <- train(log(revenue)~.,
-                data = movie.train,
-                method = "glmnet",
-                tuneLength = 10,
-                trControl = myControl,
-                metric ="rmsle",
-                maximize = FALSE); beepr::beep(3)
-model2
-
-preds <- predict(model2, newdata = movie.test) %>% exp()
-dat <- data.frame(id = movie_test$id, revenue = preds)
-write_csv(dat, "glmnet-preds.csv")
-```
-
-## Bagged MARS
-
-```{r}
-model3 <- train(log(revenue)~.,
-                data = movie.train,
-                method = "bagEarth",
-                tuneLength = 5,
-                trControl = myControl,
-                metric ="rmsle",
-                maximize = FALSE); beepr::beep(3)
-model3
-
-preds <- predict(model3, newdata = movie.test) %>% exp()
-dat <- data.frame(id = movie_test$id, revenue = preds)
-write_csv(dat, "mars-preds.csv")
-```
-
-## SVM
-
-```{r}
-model4 <- train(log(revenue)~.,
-                data = movie.train,
-                method = "svmRadial",
-                tuneLength = 5,
-                trControl = myControl,
-                metric ="rmsle",
-                maximize = FALSE); beepr::beep(3)
-model4
-
-preds <- predict(model4, newdata = movie.test) %>% exp()
-dat <- data.frame(id = movie_test$id, revenue = preds)
-write_csv(dat, "svm-preds.csv")
-```
-
-## Random Forest, No PCA (2.15475 score)
+## Random Forest
 
 ```{r}
 
 grid <- expand.grid("mtry" = c(20, 25, 30), "splitrule" = "extratrees", min.node.size = c(1, 3, 5))
 
+set.seed(1989)
 model.rf2 <- train(log(revenue)~.,
-                  data = movie.train.nopca,
+                  data = movie.train,
                   method = "ranger",
                   tuneGrid = grid,
                   trControl = myControl,
@@ -457,44 +564,41 @@ model.rf2 <- train(log(revenue)~.,
 
 model.rf2
 
-preds.rf2 <- predict(model.rf2, newdata = movie.test.nopca) %>% exp()
+preds.rf2 <- predict(model.rf2, newdata = movie.test) %>% exp()
 rf.dat2 <- data.frame(id = movie_test[,1], revenue = preds.rf2)
 write_csv(rf.dat2, path = "rf_nopca2.csv")
 
 ```
 
-## Gradient Boosting Forest, No PCA (2.07568 score)
+## Gradient Boosting Forest
 
 ```{r}
 grid <- expand.grid("n.trees"=500, "interaction.depth"=4, "shrinkage"=0.1, "n.minobsinnode"=20)
 
+set.seed(1989)
 rfb.mod <- train(log(revenue)~.,
-                 data=movie.train.nopca,
+                 data=movie.train,
                  method="gbm",
                  tuneGrid=grid,
                  trControl=myControl,
                  metric = "rmsle",
                  verbose=F); beepr::beep(3)
 
-preds <- predict(rfb.mod, newdata = movie.test.nopca) %>% exp()
+preds <- predict(rfb.mod, newdata = movie.test) %>% exp()
 dat <- data.frame(id = movie_test$id, revenue = preds)
 write_csv(dat, "rf-gboost-preds.csv")
 ```
 
-## xgbLinear, No PCA (2.1869 score)
+## xgbLinear
 
 ```{r}
-myControl <- trainControl(method = "cv",
-                          number = 3,
-                          summaryFunction = custom_summary)
-
 tunegrid <- expand.grid(nrounds = 60,
                         lambda = .01,
                         alpha = .01,
                         eta = .2)
-
+set.seed(1989)
 xgbLinear.model <- train(log(revenue)~.,
-                   data = movie.train.nopca,
+                   data = movie.train,
                    method = "xgbLinear",
                    tuneGrid = tunegrid,
                    trControl = myControl,
@@ -502,12 +606,12 @@ xgbLinear.model <- train(log(revenue)~.,
                    maximize = FALSE); beepr::beep(3)
 xgbLinear.model
 
-preds <- predict(xgbLinear.model, newdata = movie.test.nopca) %>% exp()
+preds <- predict(xgbLinear.model, newdata = movie.test) %>% exp()
 dat <- data.frame(id = movie_test$id, revenue = preds)
 write_csv(dat, "xgbLinear-preds.csv")
 ```
 
-## XGB Tree (2.09998 score)
+## XGB Tree
 
 ```{r}
 tunegrid <- expand.grid(eta = .25,
@@ -517,7 +621,7 @@ tunegrid <- expand.grid(eta = .25,
                         nrounds = 100,
                         min_child_weight = 1,
                         gamma = .075)
-
+set.seed(1989)
 xgbTree.model <- train(log(revenue)~.,
                    data = movie.train,
                    method = "xgbTree",
@@ -532,3 +636,8 @@ preds <- predict(xgbTree.model, newdata = movie.test) %>% exp()
 dat <- data.frame(id = movie_test$id, revenue = preds)
 write_csv(dat, "xgbTree-preds.csv")
 ```
+
+
+# Conclusion
+
+The best model up to this point got a RMSLE for 2.062, which is approximately the 58th percentile. There are a few things that can be done to improve this model and which I may eventually work on in the future. First, there may be some meaningful information that could be pulled out of the keywords and tagline variables. They did have quite a few missing values, but there still might have been some useful information that could have been extracted from them, which I didn't attempt at all. Second, I would like to better account for multiple genres, production countries, and production companies. I was able to select the top ten or twenty of each variable, but that was simply an arbitrary number and I have no idea if the predictions would improve or worse if I increased or decreased that number. Third, I think working with different models and playing with the tuning parameters would also lead to improvement in the predictions as well. 
