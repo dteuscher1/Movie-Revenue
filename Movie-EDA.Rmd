@@ -164,7 +164,7 @@ movie_data <- movie_data %>%
   select(-belongs_to_collection, -homepage, -tagline, -Keywords)
 ```
 
-## Cast and Crew (counts for each)
+## Cast and Crew
 
 There were a number of ideas of how to work with the cast and crew. There is a possibility of pulling out the most commonly known actors and directors to see if those movies generally had a higher revenue. I also thought about counting the number of high profile stars in each movie and seeing if that has an influence on the revenue. In the end, I simply decided to count the number of crew members and the number of cast members with the logic that movies that have a higher budget probably have more cast and crew members. From the earlier plots, budget has a positive correlation with revenue so it is likely that there is more cast and crew members, that the revenue is also higher (If this isn't a case, then a lot of money is being lost paying additional cast and crew members that don't help bring in revenue). There are a few missing values for crew variable, so the median number of crew members was imputed for the missing values. I think it may be more useful to fit a model that uses the budget and a few of the other variables to determine the number of crew members, but since there are only a few movies that have the crew information missing, I will use the median for those. 
 
