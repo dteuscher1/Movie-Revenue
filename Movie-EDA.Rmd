@@ -8,8 +8,6 @@ output:
     code_folding: show
 ---
 
-
-Packages used for analysis
 ```{r, message = FALSE}
 library(tidyverse)
 library(caret)
@@ -20,9 +18,11 @@ library(fastDummies)
 library(forcats)
 library(purrr)
 library(lubridate)
+library(scales)
+library(patchwork)
 ```
 
-# Read in the data
+# Exploratory Data Analysis
 
 ```{r, warning=FALSE}
 movie_train <- read.csv("train.csv", stringsAsFactors = FALSE, na.strings = c("", NA))
@@ -32,26 +32,54 @@ movie_data <- bind_rows(movie_train, movie_test)
 colnames(movie_data)[1] <- "id"
 colnames(movie_train)[1] <- "id"
 colnames(movie_test)[1] <- "id"
+
+glimpse(movie_data)
 ```
 
-## Initial Plots
+## Exploratory Plots
 
-```{r, message=FALSE}
-# Plots of numeric variables
-ggplot(movie_data, aes(x = popularity, y = revenue)) + geom_point() + geom_smooth(method = "loess", se = FALSE) + xlim(0, 300)
-ggplot(movie_data, aes(x = runtime, y = revenue)) + geom_point() + geom_smooth(method = "loess", se = FALSE)
-ggplot(movie_data, aes(x = budget, y = revenue)) + geom_point() + geom_smooth(method = "loess", se = FALSE)
+When looking at the plot that shows the proportion of missing values for each variable in the dataset. There appears to be a lot of missing values in a few of the variables and then a number of the variables have only a few missing values. Although it shows that there are a lot of missing values for revenue, that isn't a problem because those are missing values from the test set since the revenue is not included in the test set. For dealing with the missing values, it is easier to combine the training and test set and then to split them apart again after deciding what to do with the missing values. 
 
+```{r, message=FALSE, warning=FALSE}
 # Plot of how many values are missing
-missmap(movie_data, col = c("red", "navyblue"))
 plot_missing(movie_data)
 ```
+
+There are only a few numeric variables, so the relationship between those variables and revenue are explored in the scatterplots below. 
+```{r, warning=FALSE, message=FALSE}
+# Plots of numeric variables
+p1 <- ggplot(movie_data, aes(x = popularity, y = revenue)) + 
+  geom_point() + 
+  geom_smooth(method = "loess", se = FALSE) + 
+  xlim(0, 300) + 
+  labs(x = "Popularity", y = "Revenue") + 
+  scale_y_continuous(labels = comma) +
+  theme_classic()
+p2 <- ggplot(movie_data, aes(x = runtime, y = revenue)) + 
+  geom_point() + 
+  geom_smooth(method = "loess", se = FALSE) +
+  labs(x = "Runtime (minutes)", y = "Revenue") +
+  scale_y_continuous(labels = comma) +
+  theme_classic()
+
+p3 <- ggplot(movie_data, aes(x = budget, y = revenue)) +
+  geom_point() + 
+  geom_smooth(method = "loess", se = FALSE) +
+  labs(x = "Budget", y = "Revenue") + 
+  scale_y_continuous(labels = comma) +
+  scale_x_continuous(labels = comma) +
+  theme_classic()
+
+(p1 + p2)/p3
+```
+
+With most of the categorical variables, there is data manipulation and cleaning that needs to be done to extract the useful information. Most of the important variables are in JSON format and the relevant information will be extracted using regular expressions mostly. 
 
 # Data Cleaning
 
 ## Initial Variable Dropping
 
-Dropping some variables that we don't need at all initially
+There are some variables, `imdb_id`, `original_title`, `overview`, `poster_path`, and `status` that don't provide a lot of information about the revenue a movie brings in. As a result, those variables are dropped from the dataset. There is also one movie that did not have a release date listed, so I looked up the release data for the movie. After adding that release date, the release date was changed from a character to a date variable. 
 
 ```{r}
 movie_data <- movie_data %>% select(-imdb_id, -original_title, -overview, -poster_path, -status)
@@ -64,7 +92,7 @@ movie_data$release_date <- parse_date_time2(movie_data$release_date, orders = "%
 
 ## Categorical variables
 
-For each of these features, there is a higher average revenue when not NA than when NA
+Next, I want to look at the variables that have a high percentage of missing values. The variables `belongs_to_collection` and `homepage` are missing more than 50% of the time. `Keywords` and `tagline` are the other variables that have quite a few missing values. The revenue variable is not of concern to me here since the missing values for revenue come from the test set. Since there are so many missing values for these variables, I created dummy variables to indicate whether or not an observation had keywords, a tagline, a homepage, or belonged to a collection. The boxplots below show movies that have keywords, a tagline, a homepage, or belong to collection have a higher revenue on average. Even though the difference is small for `homepage`, I will drop the actual variables and use the dummy variables for all four of the variables. Also, the log of revenue is used to better show the difference between the group and to limit the influence outliers have on the plots. 
 
 ```{r}
 # Analyzing features with many NAs
@@ -74,26 +102,31 @@ movie_nas <- movie_train %>%
   mutate_at(.funs = list(cat = ~ifelse(is.na(.), 0, 1)), 
             .vars = c("Keywords", "tagline", "homepage",
                       "belongs_to_collection"))
+head(movie_nas)
 
-# Keywords
-mean(movie_nas[movie_nas$Keywords_cat == 1,]$revenue, na.rm = TRUE)
-mean(movie_nas[movie_nas$Keywords_cat == 0,]$revenue, na.rm = TRUE)
-boxplot(revenue~Keywords_cat, data = movie_nas)
+ggplot(movie_nas, aes(x = factor(belongs_to_collection_cat), y = log(revenue))) + 
+  geom_jitter(alpha = .2, color = 'steelblue') +
+  geom_boxplot(alpha = .1) +
+  scale_x_discrete(labels = c("No", "Yes")) +
+  labs(x = 'Belongs to a Collection', y = 'Log(Revenue)')
 
-# Tagline
-mean(movie_nas[movie_nas$tagline_cat == 1,]$revenue)
-mean(movie_nas[movie_nas$tagline_cat == 0,]$revenue)
-boxplot(revenue~tagline_cat, data = movie_nas)
+ggplot(movie_nas, aes(x = factor(Keywords_cat), y = log(revenue))) + 
+  geom_jitter(alpha = .2, color = 'steelblue') +
+  geom_boxplot(alpha = .1) +
+  scale_x_discrete(labels = c("No", "Yes")) +
+  labs(x = 'Keywords', y = 'Log(Revenue)')
 
-# Homepage
-mean(movie_nas[movie_nas$homepage_cat == 1,]$revenue)
-mean(movie_nas[movie_nas$homepage_cat == 0,]$revenue)
-boxplot(revenue~homepage_cat, data = movie_nas)
+ggplot(movie_nas, aes(x = factor(homepage_cat), y = log(revenue))) + 
+  geom_jitter(alpha = .2, color = 'steelblue') +
+  geom_boxplot(alpha = .1) +
+  scale_x_discrete(labels = c("No", "Yes")) +
+  labs(x = 'Homepage', y = 'Log(Revenue)')
 
-# Collection
-mean(movie_nas[movie_nas$belongs_to_collection_cat == 1,]$revenue)
-mean(movie_nas[movie_nas$belongs_to_collection_cat == 0,]$revenue)
-boxplot(revenue~belongs_to_collection_cat, data = movie_nas)
+ggplot(movie_nas, aes(x = factor(tagline_cat), y = log(revenue))) + 
+  geom_jitter(alpha = .2, color = 'steelblue') +
+  geom_boxplot(alpha = .1) +
+  scale_x_discrete(labels = c("No", "Yes")) +
+  labs(x = 'Homepage', y = 'Log(Revenue)')
 
 # Add indicator columns to main data
 movie_data <- movie_data %>% 
@@ -108,12 +141,37 @@ movie_data <- movie_data %>%
 
 ## Cast and Crew (counts for each)
 
+There were a number of ideas of how to work with the cast and crew. There is a possibility of pulling out the most commonly known actors and directors to see if those movies generally had a higher revenue. I also thought about counting the number of high profile stars in each movie and seeing if that has an influence on the revenue. In the end, I simply decided to count the number of crew members and the number of cast members with the logic that movies that have a higher budget probably have more cast and crew members. From the earlier plots, budget has a positive correlation with revenue so it is likely that there is more cast and crew members, that the revenue is also higher (If this isn't a case, then a lot of money is being lost paying additional cast and crew members that don't help bring in revenue). There are a few missing values for crew variable, so the median number of crew members was imputed for the missing values. I think it may be more useful to fit a model that uses the budget and a few of the other variables to determine the number of crew members, but since there are only a few movies that have the crew information missing, I will use the median for those. 
+
+
+
 ```{r}
 movie_data$cast_count <- str_count(movie_data$cast, "'name':\\s'")
 movie_data$crew_count <- str_count(movie_data$crew, "'name':\\s'")
 
 # Impute median for missing crew_count values
 movie_data[is.na(movie_data$crew_count),]$crew_count <- median(movie_data$crew_count, na.rm=TRUE)
+
+p8 <- ggplot(movie_data, aes(x = cast_count)) + 
+  geom_density(fill= "coral3") + 
+  labs(x = "Number of Cast Members", y = "Density")
+
+p9 <- ggplot(movie_data, aes(x = crew_count)) +
+  geom_density(fill = "coral3") +
+  labs(x = "Number of Crew Members", y = "Density")
+
+
+p10 <- ggplot(movie_data, aes(x = cast_count, y = revenue)) +
+  geom_point(color = "coral3") + 
+  scale_y_continuous(labels = comma) +
+  labs(x = "Number of CastMembers", y = "Revenue")
+
+p11 <- ggplot(movie_data, aes(x = crew_count, y = revenue)) +
+  geom_point(color = "coral3") + 
+  scale_y_continuous(labels = comma) +
+  labs(x = "Number of Crew Members", y = "Revenue")
+
+(p8 + p9)/(p10 + p11)
 ```
 
 ## Original Language
