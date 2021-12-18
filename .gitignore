@@ -39,6 +39,4 @@ vignettes/*.pdf
 .Renviron
 
 *.csv
-!test.csv
-!train.csv
 *.Rproj
