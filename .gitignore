@@ -41,3 +41,4 @@ vignettes/*.pdf
 *.csv
 !test.csv
 !train.csv
+*.Rproj
